@@ -1,5 +1,8 @@
 # rrd
 
+**This is work in progress and pretty much only usable to
+create new databases right now.**
+
 ```toml
 [dependencies]
 rrd = "0.1.0"
