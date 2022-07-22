@@ -4,4 +4,4 @@ mod util;
 
 pub mod error;
 
-pub use rrd::create;
+pub use ::rrd::create;
