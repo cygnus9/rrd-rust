@@ -1,0 +1,16 @@
+[package]
+name = "rrd"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.126"
+thiserror = "1.0.31"
+
+[target.'cfg(macos)'.build-dependencies]
+pkg-config = "0.3.25"
+
+[target.'cfg(unix)'.build-dependencies]
+pkg-config = "0.3.25"
