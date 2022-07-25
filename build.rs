@@ -1,6 +1,11 @@
 use std::{env, path::Path};
 
 fn main() {
+    if std::env::var("DOCS_RS").is_ok() {
+        // Nothing to do
+        return;
+    }
+
     println!("cargo:rerun-if-env-changed=LIBRRD");
     if let Ok(ref s) = env::var("LIBRRD") {
         let p = Path::new(s);
