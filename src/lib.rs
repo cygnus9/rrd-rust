@@ -2,7 +2,7 @@ use std::{
     ffi::{CStr, CString},
     path::Path,
     ptr::null,
-    time::SystemTime,
+    time::{SystemTime, Duration},
 };
 
 use crate::{
@@ -17,7 +17,7 @@ pub mod error;
 
 pub fn create(
     filename: &Path,
-    pdp_step: usize,
+    pdp_step: Duration,
     last_up: &SystemTime,
     no_overwrite: bool,
     sources: &[&Path],
@@ -39,7 +39,7 @@ pub fn create(
     let rc = unsafe {
         sys::rrd_create_r2(
             filename.as_ptr(),
-            pdp_step as sys::c_ulong,
+            pdp_step.as_secs() as sys::c_ulong,
             util::to_unix_time(last_up).unwrap(),
             if no_overwrite { 1 } else { 0 },
             sources.as_ptr(),
