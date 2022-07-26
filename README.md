@@ -31,7 +31,7 @@ shipped with the pre-build binaries shipped [here](https://github.com/oetiker/rr
 
 Follow these steps to create the `.lib` file:
 1. Download [`librrd-8.def`](https://github.com/oetiker/rrdtool-1.x/raw/master/win32/librrd-8.def)
-2. From a VS def shell: `lib /def:librrd-8.def /out:librrd-8.lib /machine:x64`
+2. From a VS dev shell: `lib /def:librrd-8.def /out:librrd-8.lib /machine:x64`
 3. Set the `LIBRRD` environment variable to the full path of `librrd-8.lib`
 
 # License
