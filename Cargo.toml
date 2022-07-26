@@ -6,11 +6,12 @@ authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
 keywords = ["rrd"]
 readme = "README.md"
+documentation = "https://docs.rs/rrd"
 repository = "https://github.com/cygnus9/rrd-rust"
 homepage = "https://github.com/cygnus9/rrd-rust"
 description = """
-Bindings to librrd to create and interact with databases created
-with Tobias Oetiker's rrdtool (https://oss.oetiker.ch/rrdtool/).
+Bindings to librrd to create and interact with round robin databases created with Tobias
+Oetiker's rrdtool (https://www.rrdtool.org/).
 """
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
