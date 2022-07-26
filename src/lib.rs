@@ -11,9 +11,8 @@ use crate::{
 };
 
 mod sys;
-mod util;
-
 pub mod error;
+pub mod util;
 
 pub fn create(
     filename: &Path,
