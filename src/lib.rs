@@ -1,8 +1,9 @@
+use bitflags::bitflags;
 use std::{
     ffi::{CStr, CString},
     path::Path,
     ptr::null,
-    time::{SystemTime, Duration},
+    time::{Duration, SystemTime},
 };
 
 use crate::{
@@ -10,8 +11,8 @@ use crate::{
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
 };
 
-mod sys;
 pub mod error;
+mod sys;
 pub mod util;
 
 pub fn create(
@@ -43,6 +44,39 @@ pub fn create(
             if no_overwrite { 1 } else { 0 },
             sources.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),
+            args.len() as sys::c_int,
+            args.as_ptr(),
+        )
+    };
+    match rc {
+        0 => Ok(()),
+        _ => Err(RrdError::LibRrdError(get_error())),
+    }
+}
+
+bitflags! {
+    pub struct ExtraFlags : sys::c_int {
+        const SKIP_PAST_UPDATES = 0x01;
+    }
+}
+
+pub fn update(
+    filename: &Path,
+    template: Option<&Path>,
+    extra_flags: ExtraFlags,
+    args: &[&str],
+) -> RrdResult<()> {
+    let filename = CString::new(path_to_str(filename)?)?;
+    let template = match template {
+        None => None,
+        Some(p) => Some(CString::new(path_to_str(p)?)?),
+    };
+    let args = ArrayOfStrings::new(args)?;
+    let rc = unsafe {
+        sys::rrd_updatex_r(
+            filename.as_ptr(),
+            template.map_or(null(), |s| s.as_ptr()),
+            extra_flags.bits(),
             args.len() as sys::c_int,
             args.as_ptr(),
         )

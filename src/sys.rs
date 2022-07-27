@@ -20,4 +20,12 @@ extern "C" {
     ) -> c_int;
 
     pub fn rrd_get_error() -> *const c_char;
+
+    pub fn rrd_updatex_r(
+        filename: *const c_char,
+        template: *const c_char,
+        extra_flags: c_int,
+        argc: c_int,
+        argv: *const *const c_char,
+    ) -> c_int;
 }

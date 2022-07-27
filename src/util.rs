@@ -8,12 +8,12 @@ use crate::error::{RrdError, RrdResult};
 use crate::sys;
 
 /// Convert a `SystemTime` to `time_t` (a.k.a. seconds since unix epoch)
-/// 
+///
 /// # Examples
 /// ```
 /// use std::time::SystemTime;
 /// use rrd::util::to_unix_time;
-/// 
+///
 /// let now = SystemTime::now();
 /// assert!(to_unix_time(&now).unwrap() > 0);
 /// ```
@@ -23,16 +23,16 @@ pub fn to_unix_time(ts: &SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
 }
 
 /// Conveniently convert a `Path` to a `&str`
-/// 
+///
 /// # Examples
 /// ```
 /// use std::path::Path;
 /// use rrd::util::path_to_str;
-/// 
+///
 /// let path = Path::new("/some/path");
 /// assert_eq!(path_to_str(path).unwrap(), "/some/path");
 /// ```
-/// 
+///
 /// Paths with invalid UTF-8 will fail though
 /// ```
 /// #[cfg(unix)] {
@@ -118,30 +118,30 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
 }
 
 /// Represents an array of pointers to nul-terminated strings.
-/// 
+///
 /// These should be used with C APIs that also take a length parameter.
-/// 
+///
 /// # Examples
 /// ```
 /// use std::ptr::null;
 /// use rrd::util::ArrayOfStrings;
-/// 
+///
 /// let array = ArrayOfStrings::new(["one", "two"]).unwrap();
 /// assert_eq!(array.len(), 2);
 /// assert!(!array.is_empty());
 /// assert_ne!(array.as_ptr(), null());
-/// 
+///
 /// unsafe {
 ///     assert_ne!(*(array.as_ptr().add(0)), null());
 ///     assert_ne!(*(array.as_ptr().add(1)), null());
 /// }
 /// ```
-/// 
+///
 /// An empty array returns `null` from `as_ptr()`.
 /// ```
 /// use std::ptr::null;
 /// use rrd::util::ArrayOfStrings;
-/// 
+///
 /// let source: &[&str] = &[];
 /// let array = ArrayOfStrings::new(source).unwrap();
 /// assert_eq!(array.len(), 0);
@@ -151,32 +151,32 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
 pub type ArrayOfStrings = MaybeNullTerminatedArrayOfStrings<false>;
 
 /// Represents a nul-terminated array of pointers to nul-terminated strings.
-/// 
+///
 /// These should be used with C APIs that don't take a length parameter but
 /// expect the last pointer in the array to be null.
-/// 
+///
 /// # Examples
 /// ```
 /// use std::ptr::null;
 /// use rrd::util::NullTerminatedArrayOfStrings;
-/// 
+///
 /// let array = NullTerminatedArrayOfStrings::new(["one", "two"]).unwrap();
 /// assert_eq!(array.len(), 2);
 /// assert!(!array.is_empty());
 /// assert_ne!(array.as_ptr(), null());
-/// 
+///
 /// unsafe {
 ///     assert_ne!(*(array.as_ptr().add(0)), null());
 ///     assert_ne!(*(array.as_ptr().add(1)), null());
 ///     assert_eq!(*(array.as_ptr().add(2)), null());
 /// }
 /// ```
-/// 
+///
 /// An empty array returns `null` from `as_ptr()`.
 /// ```
 /// use std::ptr::null;
 /// use rrd::util::NullTerminatedArrayOfStrings;
-/// 
+///
 /// let source: &[&str] = &[];
 /// let array = NullTerminatedArrayOfStrings::new(source).unwrap();
 /// assert_eq!(array.len(), 0);

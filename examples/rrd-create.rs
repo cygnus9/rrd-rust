@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 fn main() {
     let rc = rrd::create(
