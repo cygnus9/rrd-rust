@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use data::Data;
 use std::{
     ffi::{CStr, CString},
     path::Path,
@@ -11,6 +12,7 @@ use crate::{
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
 };
 
+pub mod data;
 pub mod error;
 mod sys;
 pub mod util;
@@ -18,7 +20,7 @@ pub mod util;
 pub fn create(
     filename: &Path,
     pdp_step: Duration,
-    last_up: &SystemTime,
+    last_up: SystemTime,
     no_overwrite: bool,
     sources: &[&Path],
     template: Option<&Path>,
@@ -50,6 +52,45 @@ pub fn create(
     };
     match rc {
         0 => Ok(()),
+        _ => Err(RrdError::LibRrdError(get_error())),
+    }
+}
+
+pub fn fetch(
+    filename: &Path,
+    cf: &str,
+    start: SystemTime,
+    end: SystemTime,
+    step: Duration,
+) -> RrdResult<Data> {
+    // in
+    let filename = CString::new(path_to_str(filename)?)?;
+    let cf = CString::new(cf)?;
+
+    let mut data = Data {
+        // in/out
+        start: util::to_unix_time(start).unwrap() as sys::c_time_t,
+        end: util::to_unix_time(end).unwrap() as sys::c_time_t,
+        step: step.as_secs() as sys::c_ulong,
+
+        // out
+        ..Default::default()
+    };
+
+    let rc = unsafe {
+        sys::rrd_fetch_r(
+            filename.as_ptr(),
+            cf.as_ptr(),
+            &mut data.start,
+            &mut data.end,
+            &mut data.step,
+            &mut data.ds_count,
+            &mut data.ds_names,
+            &mut data.data,
+        )
+    };
+    match rc {
+        0 => Ok(data),
         _ => Err(RrdError::LibRrdError(get_error())),
     }
 }

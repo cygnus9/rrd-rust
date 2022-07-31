@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::path::Path;
 use std::ptr::{null, null_mut};
 use std::result::Result;
-use std::time::{SystemTime, SystemTimeError};
+use std::time::{Duration, SystemTime, SystemTimeError};
 
 use crate::error::{RrdError, RrdResult};
 use crate::sys;
@@ -15,11 +15,15 @@ use crate::sys;
 /// use rrd::util::to_unix_time;
 ///
 /// let now = SystemTime::now();
-/// assert!(to_unix_time(&now).unwrap() > 0);
+/// assert!(to_unix_time(now).unwrap() > 0);
 /// ```
-pub fn to_unix_time(ts: &SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
+pub fn to_unix_time(ts: SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
     ts.duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs() as sys::c_time_t)
+}
+
+pub fn from_unix_time(ts: sys::c_time_t) -> SystemTime {
+    SystemTime::UNIX_EPOCH + Duration::from_secs(ts as u64)
 }
 
 /// Conveniently convert a `Path` to a `&str`
@@ -60,7 +64,7 @@ pub fn to_unix_time(ts: &SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
 /// }
 /// ```
 pub fn path_to_str(path: &Path) -> Result<&str, RrdError> {
-    path.to_str().ok_or_else(|| RrdError::PathEncodingError)
+    path.to_str().ok_or(RrdError::PathEncodingError)
 }
 
 pub struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bool> {

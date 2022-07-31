@@ -5,7 +5,7 @@ fn main() {
     let rc = rrd::create(
         Path::new("db.rrd"),
         Duration::from_secs(1),
-        &SystemTime::now(),
+        SystemTime::now(),
         false,
         &[],
         None,
