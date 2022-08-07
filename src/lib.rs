@@ -2,8 +2,10 @@ use bitflags::bitflags;
 use data::Data;
 use std::{
     ffi::{CStr, CString},
+    ops::Deref,
     path::Path,
     ptr::null,
+    slice,
     time::{Duration, SystemTime},
 };
 
@@ -56,43 +58,90 @@ pub fn create(
     }
 }
 
+pub struct Array {
+    ptr: *const sys::c_double,
+    len: usize,
+}
+
+impl Drop for Array {
+    fn drop(&mut self) {
+        unsafe {
+            sys::rrd_freemem(self.ptr as *mut sys::c_void);
+        }
+    }
+}
+
+impl Deref for Array {
+    type Target = [sys::c_double];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { slice::from_raw_parts(self.ptr, self.len) }
+    }
+}
+
 pub fn fetch(
     filename: &Path,
     cf: &str,
     start: SystemTime,
     end: SystemTime,
     step: Duration,
-) -> RrdResult<Data> {
+) -> RrdResult<Data<Array>> {
     // in
     let filename = CString::new(path_to_str(filename)?)?;
     let cf = CString::new(cf)?;
 
-    let mut data = Data {
-        // in/out
-        start: util::to_unix_time(start).unwrap() as sys::c_time_t,
-        end: util::to_unix_time(end).unwrap() as sys::c_time_t,
-        step: step.as_secs() as sys::c_ulong,
+    // in/out
+    let mut start = util::to_unix_time(start).unwrap();
+    let mut end = util::to_unix_time(end).unwrap();
+    let mut step = step.as_secs() as u32;
 
-        // out
-        ..Default::default()
-    };
+    // out
+    let mut ds_count = 0;
+    let mut ds_names = null();
+    let mut data = null();
 
     let rc = unsafe {
         sys::rrd_fetch_r(
             filename.as_ptr(),
             cf.as_ptr(),
-            &mut data.start,
-            &mut data.end,
-            &mut data.step,
-            &mut data.ds_count,
-            &mut data.ds_names,
-            &mut data.data,
+            &mut start,
+            &mut end,
+            &mut step,
+            &mut ds_count,
+            &mut ds_names,
+            &mut data,
         )
     };
-    match rc {
-        0 => Ok(data),
-        _ => Err(RrdError::LibRrdError(get_error())),
+    if rc != 0 {
+        return Err(RrdError::LibRrdError(get_error()));
     }
+
+    let names = unsafe {
+        let names: Vec<_> = slice::from_raw_parts(ds_names, ds_count as usize)
+            .iter()
+            .map(|p| {
+                let s = CStr::from_ptr(*p).to_string_lossy().into_owned();
+                sys::rrd_freemem(*p as *mut sys::c_void);
+                s
+            })
+            .collect();
+        sys::rrd_freemem(ds_names as *mut sys::c_void);
+        names
+    };
+
+    let rows = (end - start) as usize / step as usize + 1;
+    let data = Array {
+        ptr: data,
+        len: rows * ds_count as usize,
+    };
+
+    Ok(Data::new(
+        util::from_unix_time(start),
+        util::from_unix_time(end),
+        Duration::from_secs(step as u64),
+        names,
+        data,
+    ))
 }
 
 bitflags! {

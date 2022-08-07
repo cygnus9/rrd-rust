@@ -22,6 +22,18 @@ pub fn to_unix_time(ts: SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
         .map(|d| d.as_secs() as sys::c_time_t)
 }
 
+/// Convert a `time_t` (a.k.a. seconds since epoch) to a `SystemTime`
+/// 
+/// # Examples
+/// ```
+/// use std::ptr::null_mut;
+/// use std::time::SystemTime;
+/// use libc::time;
+/// use rrd::util::from_unix_time;
+/// 
+/// let now = unsafe { time(null_mut()) };
+/// assert!(from_unix_time(now) > SystemTime::UNIX_EPOCH);
+/// ```
 pub fn from_unix_time(ts: sys::c_time_t) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(ts as u64)
 }

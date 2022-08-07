@@ -1,109 +1,141 @@
 use std::{
-    ffi::CStr,
     ops::Deref,
-    ptr::null,
-    slice,
     time::{Duration, SystemTime},
 };
 
-use crate::{sys, util};
+use crate::sys;
 
-pub struct Data {
-    pub(crate) start: sys::c_time_t,
-    pub(crate) end: sys::c_time_t,
-    pub(crate) step: sys::c_ulong,
-    pub(crate) ds_count: sys::c_ulong,
-    pub(crate) ds_names: *const *const sys::c_char,
-    pub(crate) data: *const sys::c_double,
+/// Adds a safe abstraction on top of the result of `rrd::fetch`.
+/// 
+/// Object of this type provide access to both the data and the
+/// metadata (e.g. start, end, step and data sources).
+pub struct Data<DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    start: SystemTime,
+    end: SystemTime,
+    step: Duration,
+    names: Vec<String>,
+    data: DataType,
+    row_count: usize,
 }
 
-impl Data {
+impl<DataType> Data<DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    pub fn new(
+        start: SystemTime,
+        end: SystemTime,
+        step: Duration,
+        names: Vec<String>,
+        data: DataType,
+    ) -> Self {
+        assert!(data.len() % names.len() == 0);
+        let row_count = data.len() / names.len();
+        Self {
+            start,
+            end,
+            step,
+            names,
+            data,
+            row_count,
+        }
+    }
+
     pub fn start(&self) -> SystemTime {
-        util::from_unix_time(self.start)
+        self.start
     }
 
     pub fn end(&self) -> SystemTime {
-        util::from_unix_time(self.end)
+        self.end
     }
 
     pub fn step(&self) -> Duration {
-        Duration::from_secs(self.step as u64)
+        self.step
     }
 
+    /// Return the number of rows in the dataset.
+    /// 
+    /// # Examples
+    /// ```
+    /// use std::time::{Duration, SystemTime};
+    /// use rrd::data::Data;
+    /// 
+    /// let data = Data::new(
+    ///     SystemTime::UNIX_EPOCH, 
+    ///     SystemTime::UNIX_EPOCH, 
+    ///     Duration::from_secs(1),
+    ///     vec![String::from("ds1"), String::from("ds2")],
+    ///     vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    /// );
+    /// 
+    /// assert!(data.row_count() == 3)
+    /// ```
     pub fn row_count(&self) -> usize {
-        assert!(self.end >= self.start);
-        1 + (self.end - self.start) as usize / self.step as usize
+        self.row_count
     }
 
-    pub fn sources(&self) -> DataSources {
+    pub fn sources(&self) -> DataSources<DataType> {
         DataSources { data: self }
     }
 
-    pub fn rows(&self) -> Rows {
+    pub fn rows(&self) -> Rows<DataType> {
         Rows { data: self }
     }
 }
 
-impl Default for Data {
-    fn default() -> Self {
-        Self {
-            start: 0,
-            end: 0,
-            step: 0,
-            ds_count: 0,
-            ds_names: null(),
-            data: null(),
-        }
-    }
+pub struct DataSources<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    data: &'data Data<DataType>,
 }
 
-impl Drop for Data {
-    fn drop(&mut self) {
-        unsafe {
-            for i in 0..self.ds_count as usize {
-                sys::rrd_freemem(*self.ds_names.add(i) as *mut sys::c_void);
-            }
-            sys::rrd_freemem(self.ds_names as *mut sys::c_void);
-            sys::rrd_freemem(self.data as *mut sys::c_void);
-        }
-    }
-}
-
-pub struct DataSources<'data> {
-    data: &'data Data,
-}
-
-impl<'data> DataSources<'data> {
+impl<'data, DataType> DataSources<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
     pub fn len(&self) -> usize {
-        self.data.ds_count as usize
+        self.data.names.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.data.names.is_empty()
     }
 
-    pub fn iter(&self) -> DataSourcesIter<'data> {
+    pub fn iter(&self) -> DataSourcesIter<'data, DataType> {
         DataSourcesIter::new(self.data)
     }
 }
 
-impl<'data> IntoIterator for DataSources<'data> {
-    type Item = DataSource<'data>;
+impl<'data, DataType> IntoIterator for DataSources<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    type Item = DataSource<'data, DataType>;
 
-    type IntoIter = DataSourcesIter<'data>;
+    type IntoIter = DataSourcesIter<'data, DataType>;
 
     fn into_iter(self) -> Self::IntoIter {
         DataSourcesIter::new(self.data)
     }
 }
 
-pub struct DataSourcesIter<'data> {
-    data: &'data Data,
+pub struct DataSourcesIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    data: &'data Data<DataType>,
     next_index: usize,
 }
 
-impl<'data> DataSourcesIter<'data> {
-    fn new(data: &'data Data) -> Self {
+impl<'data, DataType> DataSourcesIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    fn new(data: &'data Data<DataType>) -> Self {
         Self {
             data,
             next_index: 0,
@@ -111,11 +143,14 @@ impl<'data> DataSourcesIter<'data> {
     }
 }
 
-impl<'data> Iterator for DataSourcesIter<'data> {
-    type Item = DataSource<'data>;
+impl<'data, DataType> Iterator for DataSourcesIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    type Item = DataSource<'data, DataType>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.next_index < self.data.ds_count as usize {
+        if self.next_index < self.data.names.len() {
             let index = self.next_index;
             self.next_index += 1;
             Some(DataSource {
@@ -128,85 +163,104 @@ impl<'data> Iterator for DataSourcesIter<'data> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let ds_count = self.data.ds_count as usize;
+        let ds_count = self.data.names.len();
         let remaining = ds_count - self.next_index.min(ds_count);
         (remaining, Some(remaining))
     }
 }
 
-impl ExactSizeIterator for DataSourcesIter<'_> {}
+impl<DataType> ExactSizeIterator for DataSourcesIter<'_, DataType> where
+    DataType: Deref<Target = [sys::c_double]>
+{
+}
 
-pub struct DataSource<'data> {
-    data: &'data Data,
+pub struct DataSource<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    data: &'data Data<DataType>,
     index: usize,
 }
 
-impl<'data> DataSource<'data> {
+impl<'data, DataType> DataSource<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
     pub fn name(&self) -> &'data str {
-        unsafe {
-            let p = self.data.ds_names.add(self.index);
-            let s = CStr::from_ptr(*p);
-            s.to_str().unwrap()
-        }
+        &self.data.names[self.index]
     }
 }
 
-pub struct Rows<'data> {
-    data: &'data Data,
+pub struct Rows<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    data: &'data Data<DataType>,
 }
 
-impl<'data> Rows<'data> {
+impl<'data, DataType> Rows<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
     pub fn len(&self) -> usize {
         self.data.row_count()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.data.row_count() == 0
     }
 
-    pub fn iter(&self) -> RowsIter<'data> {
+    pub fn iter(&self) -> RowsIter<'data, DataType> {
         RowsIter::new(self.data)
     }
 }
 
-impl<'data> IntoIterator for Rows<'data> {
+impl<'data, DataType> IntoIterator for Rows<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
     type Item = Row<'data>;
 
-    type IntoIter = RowsIter<'data>;
+    type IntoIter = RowsIter<'data, DataType>;
 
     fn into_iter(self) -> Self::IntoIter {
         RowsIter::new(self.data)
     }
 }
 
-pub struct RowsIter<'data> {
-    data: &'data Data,
-    names: Vec<&'data str>,
+pub struct RowsIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    data: &'data Data<DataType>,
     max_index: usize,
     next_index: usize,
 }
 
-impl<'data> RowsIter<'data> {
-    fn new(data: &'data Data) -> Self {
-        let names: Vec<_> = data.sources().iter().map(|s| s.name()).collect();
+impl<'data, DataType> RowsIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
+    fn new(data: &'data Data<DataType>) -> Self {
         Self {
             data,
-            names,
             max_index: data.row_count(),
             next_index: 0,
         }
     }
 }
 
-impl<'data, 'iterator> Iterator for RowsIter<'data> {
+impl<'data, 'iterator, DataType> Iterator for RowsIter<'data, DataType>
+where
+    DataType: Deref<Target = [sys::c_double]>,
+{
     type Item = Row<'data>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.next_index < self.max_index {
             let index = self.next_index;
             self.next_index += 1;
-            // Some(Row{data: self.data, names: &self.names, index})
-            Some(Row::new(self.data, &self.names, index))
+            Some(Row::new(self.data, index))
         } else {
             None
         }
@@ -217,7 +271,10 @@ impl<'data, 'iterator> Iterator for RowsIter<'data> {
     }
 }
 
-impl ExactSizeIterator for RowsIter<'_> {}
+impl<DataType> ExactSizeIterator for RowsIter<'_, DataType> where
+    DataType: Deref<Target = [sys::c_double]>
+{
+}
 
 pub struct Row<'data> {
     timestamp: SystemTime,
@@ -225,13 +282,16 @@ pub struct Row<'data> {
 }
 
 impl<'data> Row<'data> {
-    fn new(data: &'data Data, names: &[&'data str], index: usize) -> Self {
+    fn new<DataType>(data: &'data Data<DataType>, index: usize) -> Self
+    where
+        DataType: Deref<Target = [sys::c_double]>,
+    {
         let timestamp = data.start() + data.step() * index as u32;
-        let offset = data.ds_count as usize * index;
-        let values =
-            unsafe { slice::from_raw_parts(data.data.add(offset), data.ds_count as usize) };
-        assert!(values.len() == names.len());
-        let cells = names
+        let offset = data.names.len() * index;
+        let values = &data.data.as_ref()[offset..offset + data.names.len()];
+        assert!(values.len() == data.names.len());
+        let cells = data
+            .names
             .iter()
             .zip(values)
             .map(|(name, value)| Cell {
