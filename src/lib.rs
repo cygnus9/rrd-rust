@@ -93,7 +93,7 @@ pub fn fetch(
     // in/out
     let mut start = util::to_unix_time(start).unwrap();
     let mut end = util::to_unix_time(end).unwrap();
-    let mut step = step.as_secs() as u32;
+    let mut step = step.as_secs() as sys::c_ulong;
 
     // out
     let mut ds_count = 0;
