@@ -6,31 +6,31 @@ use std::{
 use crate::sys;
 
 /// Adds a safe abstraction on top of the result of `rrd::fetch`.
-/// 
+///
 /// Object of this type provide access to both the data and the
 /// metadata (e.g. start, end, step and data sources).
-pub struct Data<DataType>
+pub struct Data<T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     start: SystemTime,
     end: SystemTime,
     step: Duration,
     names: Vec<String>,
-    data: DataType,
+    data: T,
     row_count: usize,
 }
 
-impl<DataType> Data<DataType>
+impl<T> Data<T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     pub fn new(
         start: SystemTime,
         end: SystemTime,
         step: Duration,
         names: Vec<String>,
-        data: DataType,
+        data: T,
     ) -> Self {
         assert!(data.len() % names.len() == 0);
         let row_count = data.len() / names.len();
@@ -57,45 +57,45 @@ where
     }
 
     /// Return the number of rows in the dataset.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use std::time::{Duration, SystemTime};
     /// use rrd::data::Data;
-    /// 
+    ///
     /// let data = Data::new(
-    ///     SystemTime::UNIX_EPOCH, 
-    ///     SystemTime::UNIX_EPOCH, 
+    ///     SystemTime::UNIX_EPOCH,
+    ///     SystemTime::UNIX_EPOCH,
     ///     Duration::from_secs(1),
     ///     vec![String::from("ds1"), String::from("ds2")],
     ///     vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
     /// );
-    /// 
+    ///
     /// assert!(data.row_count() == 3)
     /// ```
     pub fn row_count(&self) -> usize {
         self.row_count
     }
 
-    pub fn sources(&self) -> DataSources<DataType> {
+    pub fn sources(&self) -> DataSources<T> {
         DataSources { data: self }
     }
 
-    pub fn rows(&self) -> Rows<DataType> {
+    pub fn rows(&self) -> Rows<T> {
         Rows { data: self }
     }
 }
 
-pub struct DataSources<'data, DataType>
+pub struct DataSources<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    data: &'data Data<DataType>,
+    data: &'data Data<T>,
 }
 
-impl<'data, DataType> DataSources<'data, DataType>
+impl<'data, T> DataSources<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     pub fn len(&self) -> usize {
         self.data.names.len()
@@ -105,37 +105,37 @@ where
         self.data.names.is_empty()
     }
 
-    pub fn iter(&self) -> DataSourcesIter<'data, DataType> {
+    pub fn iter(&self) -> DataSourcesIter<'data, T> {
         DataSourcesIter::new(self.data)
     }
 }
 
-impl<'data, DataType> IntoIterator for DataSources<'data, DataType>
+impl<'data, T> IntoIterator for DataSources<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    type Item = DataSource<'data, DataType>;
+    type Item = DataSource<'data, T>;
 
-    type IntoIter = DataSourcesIter<'data, DataType>;
+    type IntoIter = DataSourcesIter<'data, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         DataSourcesIter::new(self.data)
     }
 }
 
-pub struct DataSourcesIter<'data, DataType>
+pub struct DataSourcesIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    data: &'data Data<DataType>,
+    data: &'data Data<T>,
     next_index: usize,
 }
 
-impl<'data, DataType> DataSourcesIter<'data, DataType>
+impl<'data, T> DataSourcesIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    fn new(data: &'data Data<DataType>) -> Self {
+    fn new(data: &'data Data<T>) -> Self {
         Self {
             data,
             next_index: 0,
@@ -143,11 +143,11 @@ where
     }
 }
 
-impl<'data, DataType> Iterator for DataSourcesIter<'data, DataType>
+impl<'data, T> Iterator for DataSourcesIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    type Item = DataSource<'data, DataType>;
+    type Item = DataSource<'data, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.next_index < self.data.names.len() {
@@ -169,38 +169,35 @@ where
     }
 }
 
-impl<DataType> ExactSizeIterator for DataSourcesIter<'_, DataType> where
-    DataType: Deref<Target = [sys::c_double]>
-{
-}
+impl<T> ExactSizeIterator for DataSourcesIter<'_, T> where T: Deref<Target = [sys::c_double]> {}
 
-pub struct DataSource<'data, DataType>
+pub struct DataSource<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    data: &'data Data<DataType>,
+    data: &'data Data<T>,
     index: usize,
 }
 
-impl<'data, DataType> DataSource<'data, DataType>
+impl<'data, T> DataSource<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     pub fn name(&self) -> &'data str {
         &self.data.names[self.index]
     }
 }
 
-pub struct Rows<'data, DataType>
+pub struct Rows<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    data: &'data Data<DataType>,
+    data: &'data Data<T>,
 }
 
-impl<'data, DataType> Rows<'data, DataType>
+impl<'data, T> Rows<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     pub fn len(&self) -> usize {
         self.data.row_count()
@@ -210,38 +207,38 @@ where
         self.data.row_count() == 0
     }
 
-    pub fn iter(&self) -> RowsIter<'data, DataType> {
+    pub fn iter(&self) -> RowsIter<'data, T> {
         RowsIter::new(self.data)
     }
 }
 
-impl<'data, DataType> IntoIterator for Rows<'data, DataType>
+impl<'data, T> IntoIterator for Rows<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     type Item = Row<'data>;
 
-    type IntoIter = RowsIter<'data, DataType>;
+    type IntoIter = RowsIter<'data, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         RowsIter::new(self.data)
     }
 }
 
-pub struct RowsIter<'data, DataType>
+pub struct RowsIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    data: &'data Data<DataType>,
+    data: &'data Data<T>,
     max_index: usize,
     next_index: usize,
 }
 
-impl<'data, DataType> RowsIter<'data, DataType>
+impl<'data, T> RowsIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
-    fn new(data: &'data Data<DataType>) -> Self {
+    fn new(data: &'data Data<T>) -> Self {
         Self {
             data,
             max_index: data.row_count(),
@@ -250,9 +247,9 @@ where
     }
 }
 
-impl<'data, 'iterator, DataType> Iterator for RowsIter<'data, DataType>
+impl<'data, 'iterator, T> Iterator for RowsIter<'data, T>
 where
-    DataType: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [sys::c_double]>,
 {
     type Item = Row<'data>;
 
@@ -271,10 +268,7 @@ where
     }
 }
 
-impl<DataType> ExactSizeIterator for RowsIter<'_, DataType> where
-    DataType: Deref<Target = [sys::c_double]>
-{
-}
+impl<T> ExactSizeIterator for RowsIter<'_, T> where T: Deref<Target = [sys::c_double]> {}
 
 pub struct Row<'data> {
     timestamp: SystemTime,
@@ -282,9 +276,9 @@ pub struct Row<'data> {
 }
 
 impl<'data> Row<'data> {
-    fn new<DataType>(data: &'data Data<DataType>, index: usize) -> Self
+    fn new<T>(data: &'data Data<T>, index: usize) -> Self
     where
-        DataType: Deref<Target = [sys::c_double]>,
+        T: Deref<Target = [sys::c_double]>,
     {
         let timestamp = data.start() + data.step() * index as u32;
         let offset = data.names.len() * index;
