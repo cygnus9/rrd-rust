@@ -13,11 +13,19 @@ use crate::{
     error::{RrdError, RrdResult},
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
 };
+use crate::sys::rrd_info_t;
 
 pub mod data;
 pub mod error;
 mod sys;
 pub mod util;
+
+#[allow(non_camel_case_types)]
+pub type c_ulong = std::os::raw::c_ulong;
+#[allow(non_camel_case_types)]
+pub type c_char = std::os::raw::c_char;
+#[allow(non_camel_case_types)]
+pub type c_int = std::os::raw::c_int;
 
 pub fn create(
     filename: &Path,
@@ -177,10 +185,36 @@ pub fn update(
     }
 }
 
-fn get_error() -> String {
-    unsafe {
-        let p = sys::rrd_get_error();
-        let s = CStr::from_ptr(p);
-        s.to_str().unwrap().to_owned()
+pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
+    let c_filename = CString::new(filename).unwrap();
+    let arg_ptrs: Vec<_> = args.iter()
+        .map(|s| CString::new(*s).unwrap().into_raw())
+        .collect();
+
+    let mut argv = vec![c_filename.as_ptr()];
+    argv.extend(arg_ptrs.iter().map(|&s| s as *const c_char));
+
+    let argc = argv.len() as c_int;
+
+    let prdata: *mut *mut c_char = std::ptr::null_mut();
+    let xsize: *mut c_ulong = std::ptr::null_mut();
+    let ysize: *mut c_ulong = std::ptr::null_mut();
+    let info: *mut *mut rrd_info_t = std::ptr::null_mut();
+
+    let res = unsafe {
+        sys::rrd_graph(argc, argv.as_ptr(), prdata, xsize, ysize, info)
+    };
+
+    // Important! To avoid memory leaking we need to turn CString back from the pointer.
+    // If not, Rust will not clean it up automatically.
+    for &s in &arg_ptrs {
+        unsafe {
+            let _ = CString::from_raw(s);
+        }
+    }
+
+    match res {
+        0 => Ok(()),
+        _ => Err(RrdError::LibRrdError(get_error())),
     }
 }
