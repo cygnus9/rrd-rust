@@ -191,7 +191,7 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
         .map(|s| CString::new(*s).unwrap().into_raw())
         .collect();
 
-    let mut argv = vec![c_filename.as_ptr()];
+    let mut argv = vec![CString::new("rrd_graphy").unwrap().as_ptr(), c_filename.as_ptr()];
     argv.extend(arg_ptrs.iter().map(|&s| s as *const c_char));
 
     let argc = argv.len() as c_int;
