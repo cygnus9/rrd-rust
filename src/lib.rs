@@ -212,7 +212,7 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
             let _ = CString::from_raw(s);
         }
     }
-
+    println!("hmm")
     match res {
         0 => Ok(()),
         _ => Err(RrdError::LibRrdError(get_error())),

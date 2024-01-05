@@ -1,6 +1,6 @@
 [package]
 name = "rrd"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
