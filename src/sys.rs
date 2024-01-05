@@ -32,7 +32,7 @@ pub union rrd_infoval_t {
     u_val: f64,        // assuming rrd_value_t is equivalent to double in C
     u_str: *mut c_char,
     u_int: c_int,
-    u_blo: rrd_blob_t,
+    u_blo: std::mem::ManuallyDrop<rrd_blob_t>,
 }
 
 #[repr(C)]
