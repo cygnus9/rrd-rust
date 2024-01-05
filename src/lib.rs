@@ -218,3 +218,11 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
         _ => Err(RrdError::LibRrdError(get_error())),
     }
 }
+
+fn get_error() -> String {
+    unsafe {
+        let p = sys::rrd_get_error();
+        let s = CStr::from_ptr(p);
+        s.to_str().unwrap().to_owned()
+    }
+}
