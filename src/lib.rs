@@ -1,5 +1,6 @@
 use bitflags::bitflags;
 use data::Data;
+use libc::FILE;
 use std::{
     ffi::{CStr, CString},
     ops::Deref,
@@ -13,7 +14,6 @@ use crate::{
     error::{RrdError, RrdResult},
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
 };
-use crate::sys::rrd_info_t;
 
 pub mod data;
 pub mod error;
@@ -191,20 +191,26 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
         .map(|s| CString::new(*s).unwrap().into_raw())
         .collect();
 
-    let mut argv = vec![CString::new("rrd_graphy").unwrap().as_ptr(), c_filename.as_ptr()];
+    let rrd_graph_str = CString::new("rrd_graphy").unwrap();
+    let rrd_graph_str_ptr = rrd_graph_str.as_ptr();
+
+    let mut argv = vec![rrd_graph_str_ptr, c_filename.as_ptr()];
     argv.extend(arg_ptrs.iter().map(|&s| s as *const c_char));
 
     let argc = argv.len() as c_int;
 
     let prdata: *mut *mut c_char = std::ptr::null_mut();
-    let xsize: *mut c_ulong = std::ptr::null_mut();
-    let ysize: *mut c_ulong = std::ptr::null_mut();
-    let info: *mut *mut rrd_info_t = std::ptr::null_mut();
+    let mut xsize: c_int = 0;
+    let mut ysize: c_int = 0;
+    let stream: *mut FILE = std::ptr::null_mut();
+    let mut ymin: f64 = 0.0;
+    let mut ymax: f64 = 0.0;
 
+    println!("haw");
     let res = unsafe {
-        sys::rrd_graph(argc, argv.as_ptr(), prdata, xsize, ysize, info)
+        sys::rrd_graph(argc, argv.as_ptr(), prdata, &mut xsize, &mut ysize, stream, &mut ymin, &mut ymax)
     };
-
+    println!("hurr");
     // Important! To avoid memory leaking we need to turn CString back from the pointer.
     // If not, Rust will not clean it up automatically.
     for &s in &arg_ptrs {
