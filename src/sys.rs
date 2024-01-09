@@ -57,7 +57,7 @@ extern "C" {
     pub fn rrd_graph(
         argc: c_int,
         argv: *const *const c_char,
-        prdata: *mut *mut c_char,
+        prdata: *mut *mut *mut c_char,
         xsize: *mut c_int,
         ysize: *mut c_int,
         stream: *mut FILE,

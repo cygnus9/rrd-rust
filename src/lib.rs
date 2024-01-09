@@ -188,37 +188,27 @@ pub fn update(
 pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
     let c_filename = CString::new(filename).unwrap();
     let arg_ptrs: Vec<_> = args.iter()
-        .map(|s| CString::new(*s).unwrap().into_raw())
+        .map(|s| CString::new(*s).unwrap())
         .collect();
 
-    let rrd_graph_str = CString::new("rrd_graphy").unwrap();
+    let rrd_graph_str = CString::new("rrd_graph").unwrap();
     let rrd_graph_str_ptr = rrd_graph_str.as_ptr();
 
     let mut argv = vec![rrd_graph_str_ptr, c_filename.as_ptr()];
-    argv.extend(arg_ptrs.iter().map(|&s| s as *const c_char));
+    argv.extend(arg_ptrs.iter().map(|s| s.as_ptr()));
 
     let argc = argv.len() as c_int;
 
-    let prdata: *mut *mut c_char = std::ptr::null_mut();
+    let mut prdata: *mut *mut c_char = std::ptr::null_mut();
     let mut xsize: c_int = 0;
     let mut ysize: c_int = 0;
     let stream: *mut FILE = std::ptr::null_mut();
     let mut ymin: f64 = 0.0;
     let mut ymax: f64 = 0.0;
 
-    println!("haw");
     let res = unsafe {
-        sys::rrd_graph(argc, argv.as_ptr(), prdata, &mut xsize, &mut ysize, stream, &mut ymin, &mut ymax)
+        sys::rrd_graph(argc, argv.as_ptr(), &mut prdata, &mut xsize, &mut ysize, stream, &mut ymin, &mut ymax)
     };
-    println!("hurr");
-    // Important! To avoid memory leaking we need to turn CString back from the pointer.
-    // If not, Rust will not clean it up automatically.
-    for &s in &arg_ptrs {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
-    }
-    println!("hmm");
     match res {
         0 => Ok(()),
         _ => Err(RrdError::LibRrdError(get_error())),
