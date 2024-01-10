@@ -10,14 +10,44 @@ pub type c_time_t = libc::time_t;
 pub type c_ulong = std::os::raw::c_ulong;
 #[allow(non_camel_case_types)]
 pub type c_void = std::os::raw::c_void;
+pub type rrd_value_t = c_double;
 
+use std::os::raw::c_uchar;
 use libc::FILE;
 
 #[repr(C)]
 pub struct rrd_blob_t {
-    size: c_ulong,   // size of the blob
-    ptr: *mut u8,    // pointer
+    pub size: c_ulong,
+    pub ptr: *mut c_uchar,
 }
+
+#[repr(C)]
+pub union rrd_infoval_t {
+    pub u_cnt: c_ulong,
+    pub u_val: rrd_value_t,
+    pub u_str: *mut c_char,
+    pub u_int: c_int,
+    pub u_blo: std::mem::ManuallyDrop<rrd_blob_t>,
+}
+
+
+#[repr(C)]
+pub enum rrd_info_type_t {
+    RD_I_VAL = 0,
+    RD_I_CNT,
+    RD_I_STR,
+    RD_I_INT,
+    RD_I_BLO,
+}
+
+#[repr(C)]
+pub struct rrd_info_t {
+    pub key: *mut c_char,
+    pub type_: rrd_info_type_t,
+    pub value: rrd_infoval_t,
+    pub next: *mut rrd_info_t,
+}
+
 
 extern "C" {
     pub fn rrd_create_r2(
@@ -62,6 +92,8 @@ extern "C" {
         ysize: *mut c_int,
         stream: *mut FILE,
         ymin: *mut f64,
-        ymax: *mut f64
+        ymax: *mut f64,
     ) -> c_int;
+
+    pub fn rrd_info_r(filename: *const c_char) -> *mut rrd_info_t;
 }
