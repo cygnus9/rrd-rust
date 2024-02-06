@@ -1,15 +1,15 @@
 #[allow(non_camel_case_types)]
-pub type c_char = std::os::raw::c_char;
+pub type c_char = core::ffi::c_char;
 #[allow(non_camel_case_types)]
-pub type c_double = std::os::raw::c_double;
+pub type c_double = core::ffi::c_double;
 #[allow(non_camel_case_types)]
-pub type c_int = std::os::raw::c_int;
+pub type c_int = core::ffi::c_int;
 #[allow(non_camel_case_types)]
 pub type c_time_t = libc::time_t;
 #[allow(non_camel_case_types)]
-pub type c_ulong = std::os::raw::c_ulong;
+pub type c_ulong = core::ffi::c_ulong;
 #[allow(non_camel_case_types)]
-pub type c_void = std::os::raw::c_void;
+pub type c_void = core::ffi::c_void;
 pub type rrd_value_t = c_double;
 
 use std::os::raw::c_uchar;
