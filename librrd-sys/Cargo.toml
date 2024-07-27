@@ -1,10 +1,10 @@
 [package]
-name = "rrd"
-version = "0.1.1"
+name = "rrd-sys"
+version = "0.1.0"
 edition = "2021"
 authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
-keywords = ["rrd"]
+keywords = ["rrd", "sys"]
 readme = "README.md"
 documentation = "https://docs.rs/rrd"
 repository = "https://github.com/cygnus9/rrd-rust"
@@ -16,12 +16,11 @@ Oetiker's rrdtool (https://www.rrdtool.org/).
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-rrd-sys = { version = "0.1.0", path = "librrd-sys" }
+[build-dependencies]
+bindgen = "0.69.4"
 
-bitflags = "2.6.0"
-libc = "0.2.155"
-thiserror = "1.0.63"
+[target.'cfg(macos)'.build-dependencies]
+pkg-config = "0.3.30"
 
-[dev-dependencies]
-chrono = "0.4.38"
+[target.'cfg(unix)'.build-dependencies]
+pkg-config = "0.3.30"

@@ -4,7 +4,7 @@ use std::{
     ffi::{CStr, CString},
     ops::Deref,
     path::Path,
-    ptr::null,
+    ptr::{null, null_mut},
     slice,
     time::{Duration, SystemTime},
 };
@@ -16,7 +16,6 @@ use crate::{
 
 pub mod data;
 pub mod error;
-mod sys;
 pub mod util;
 
 pub fn create(
@@ -41,14 +40,14 @@ pub fn create(
     let args = ArrayOfStrings::new(args)?;
 
     let rc = unsafe {
-        sys::rrd_create_r2(
+        rrd_sys::rrd_create_r2(
             filename.as_ptr(),
-            pdp_step.as_secs() as sys::c_ulong,
+            pdp_step.as_secs() as rrd_sys::c_ulong,
             util::to_unix_time(last_up).unwrap(),
             if no_overwrite { 1 } else { 0 },
             sources.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),
-            args.len() as sys::c_int,
+            args.len() as rrd_sys::c_int,
             args.as_ptr(),
         )
     };
@@ -59,20 +58,20 @@ pub fn create(
 }
 
 pub struct Array {
-    ptr: *const sys::c_double,
+    ptr: *const rrd_sys::c_double,
     len: usize,
 }
 
 impl Drop for Array {
     fn drop(&mut self) {
         unsafe {
-            sys::rrd_freemem(self.ptr as *mut sys::c_void);
+            rrd_sys::rrd_freemem(self.ptr as *mut rrd_sys::c_void);
         }
     }
 }
 
 impl Deref for Array {
-    type Target = [sys::c_double];
+    type Target = [rrd_sys::c_double];
 
     fn deref(&self) -> &Self::Target {
         unsafe { slice::from_raw_parts(self.ptr, self.len) }
@@ -93,15 +92,15 @@ pub fn fetch(
     // in/out
     let mut start = util::to_unix_time(start).unwrap();
     let mut end = util::to_unix_time(end).unwrap();
-    let mut step = step.as_secs() as sys::c_ulong;
+    let mut step = step.as_secs() as rrd_sys::c_ulong;
 
     // out
     let mut ds_count = 0;
-    let mut ds_names = null();
-    let mut data = null();
+    let mut ds_names = null_mut();
+    let mut data = null_mut();
 
     let rc = unsafe {
-        sys::rrd_fetch_r(
+        rrd_sys::rrd_fetch_r(
             filename.as_ptr(),
             cf.as_ptr(),
             &mut start,
@@ -121,11 +120,11 @@ pub fn fetch(
             .iter()
             .map(|p| {
                 let s = CStr::from_ptr(*p).to_string_lossy().into_owned();
-                sys::rrd_freemem(*p as *mut sys::c_void);
+                rrd_sys::rrd_freemem(*p as *mut rrd_sys::c_void);
                 s
             })
             .collect();
-        sys::rrd_freemem(ds_names as *mut sys::c_void);
+        rrd_sys::rrd_freemem(ds_names as *mut rrd_sys::c_void);
         names
     };
 
@@ -145,7 +144,7 @@ pub fn fetch(
 }
 
 bitflags! {
-    pub struct ExtraFlags : sys::c_int {
+    pub struct ExtraFlags : rrd_sys::c_int {
         const SKIP_PAST_UPDATES = 0x01;
     }
 }
@@ -163,11 +162,11 @@ pub fn update(
     };
     let args = ArrayOfStrings::new(args)?;
     let rc = unsafe {
-        sys::rrd_updatex_r(
+        rrd_sys::rrd_updatex_r(
             filename.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),
             extra_flags.bits(),
-            args.len() as sys::c_int,
+            args.len() as rrd_sys::c_int,
             args.as_ptr(),
         )
     };
@@ -179,7 +178,7 @@ pub fn update(
 
 fn get_error() -> String {
     unsafe {
-        let p = sys::rrd_get_error();
+        let p = rrd_sys::rrd_get_error();
         let s = CStr::from_ptr(p);
         s.to_str().unwrap().to_owned()
     }
