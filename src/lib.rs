@@ -1,5 +1,6 @@
 use bitflags::bitflags;
 use data::Data;
+use rrd_sys::{rrd_double, rrd_int, rrd_ulong, rrd_void};
 use std::{
     ffi::{CStr, CString},
     ops::Deref,
@@ -42,12 +43,12 @@ pub fn create(
     let rc = unsafe {
         rrd_sys::rrd_create_r2(
             filename.as_ptr(),
-            pdp_step.as_secs() as rrd_sys::c_ulong,
+            pdp_step.as_secs() as rrd_ulong,
             util::to_unix_time(last_up).unwrap(),
             if no_overwrite { 1 } else { 0 },
             sources.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),
-            args.len() as rrd_sys::c_int,
+            args.len() as rrd_int,
             args.as_ptr(),
         )
     };
@@ -58,20 +59,20 @@ pub fn create(
 }
 
 pub struct Array {
-    ptr: *const rrd_sys::c_double,
+    ptr: *const rrd_double,
     len: usize,
 }
 
 impl Drop for Array {
     fn drop(&mut self) {
         unsafe {
-            rrd_sys::rrd_freemem(self.ptr as *mut rrd_sys::c_void);
+            rrd_sys::rrd_freemem(self.ptr as *mut rrd_void);
         }
     }
 }
 
 impl Deref for Array {
-    type Target = [rrd_sys::c_double];
+    type Target = [rrd_double];
 
     fn deref(&self) -> &Self::Target {
         unsafe { slice::from_raw_parts(self.ptr, self.len) }
@@ -92,7 +93,7 @@ pub fn fetch(
     // in/out
     let mut start = util::to_unix_time(start).unwrap();
     let mut end = util::to_unix_time(end).unwrap();
-    let mut step = step.as_secs() as rrd_sys::c_ulong;
+    let mut step = step.as_secs() as rrd_ulong;
 
     // out
     let mut ds_count = 0;
@@ -120,11 +121,11 @@ pub fn fetch(
             .iter()
             .map(|p| {
                 let s = CStr::from_ptr(*p).to_string_lossy().into_owned();
-                rrd_sys::rrd_freemem(*p as *mut rrd_sys::c_void);
+                rrd_sys::rrd_freemem(*p as *mut rrd_void);
                 s
             })
             .collect();
-        rrd_sys::rrd_freemem(ds_names as *mut rrd_sys::c_void);
+        rrd_sys::rrd_freemem(ds_names as *mut rrd_void);
         names
     };
 
@@ -144,7 +145,7 @@ pub fn fetch(
 }
 
 bitflags! {
-    pub struct ExtraFlags : rrd_sys::c_int {
+    pub struct ExtraFlags : rrd_int {
         const SKIP_PAST_UPDATES = 0x01;
     }
 }
@@ -166,7 +167,7 @@ pub fn update(
             filename.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),
             extra_flags.bits(),
-            args.len() as rrd_sys::c_int,
+            args.len() as rrd_int,
             args.as_ptr(),
         )
     };

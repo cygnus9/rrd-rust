@@ -1,3 +1,4 @@
+use rrd_sys::rrd_char;
 use std::ffi::CString;
 use std::path::Path;
 use std::ptr::null_mut;
@@ -79,7 +80,7 @@ pub fn path_to_str(path: &Path) -> Result<&str, RrdError> {
 }
 
 pub struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bool> {
-    pointers: Vec<*mut rrd_sys::c_char>,
+    pointers: Vec<*mut rrd_char>,
 }
 
 impl<const IS_NULL_TERMINATED: bool> Drop
@@ -111,11 +112,11 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
         Ok(Self { pointers })
     }
 
-    pub fn as_ptr(&self) -> *mut *const rrd_sys::c_char {
+    pub fn as_ptr(&self) -> *mut *const rrd_char {
         if self.is_empty() {
             null_mut()
         } else {
-            self.pointers.as_ptr() as *mut *const rrd_sys::c_char
+            self.pointers.as_ptr() as *mut *const rrd_char
         }
     }
 
