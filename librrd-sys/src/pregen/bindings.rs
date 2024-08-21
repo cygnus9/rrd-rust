@@ -513,14 +513,14 @@ extern "C" {
 }
 extern "C" {
     pub fn rrd_graph(
-        arg1: ::core::ffi::c_int,
-        arg2: *mut *mut ::core::ffi::c_char,
-        arg3: *mut *mut *mut ::core::ffi::c_char,
-        arg4: *mut ::core::ffi::c_int,
-        arg5: *mut ::core::ffi::c_int,
-        arg6: *mut FILE,
-        arg7: *mut f64,
-        arg8: *mut f64,
+        argc: ::core::ffi::c_int,
+        argv: *mut *mut ::core::ffi::c_char,
+        prdata: *mut *mut *mut ::core::ffi::c_char,
+        xsize: *mut ::core::ffi::c_int,
+        ysize: *mut ::core::ffi::c_int,
+        stream: *mut FILE,
+        ymin: *mut f64,
+        ymax: *mut f64
     ) -> ::core::ffi::c_int;
 }
 extern "C" {
@@ -627,7 +627,7 @@ extern "C" {
     ) -> ::core::ffi::c_int;
 }
 extern "C" {
-    pub fn rrd_info_r(arg1: *const ::core::ffi::c_char) -> *mut rrd_info_t;
+    pub fn rrd_info_r(filename: *const ::core::ffi::c_char) -> *mut rrd_info_t;
 }
 extern "C" {
     pub fn rrd_update_r(
