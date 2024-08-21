@@ -1,11 +1,11 @@
+use rrd_sys::rrd_char;
 use std::ffi::CString;
 use std::path::Path;
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 use std::result::Result;
 use std::time::{Duration, SystemTime, SystemTimeError};
 
 use crate::error::{RrdError, RrdResult};
-use crate::sys;
 
 /// Convert a `SystemTime` to `time_t` (a.k.a. seconds since unix epoch)
 ///
@@ -17,9 +17,9 @@ use crate::sys;
 /// let now = SystemTime::now();
 /// assert!(to_unix_time(now).unwrap() > 0);
 /// ```
-pub fn to_unix_time(ts: SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
+pub fn to_unix_time(ts: SystemTime) -> Result<rrd_sys::time_t, SystemTimeError> {
     ts.duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs() as sys::c_time_t)
+        .map(|d| d.as_secs() as rrd_sys::time_t)
 }
 
 /// Convert a `time_t` (a.k.a. seconds since epoch) to a `SystemTime`
@@ -34,7 +34,7 @@ pub fn to_unix_time(ts: SystemTime) -> Result<sys::c_time_t, SystemTimeError> {
 /// let now = unsafe { time(null_mut()) };
 /// assert!(from_unix_time(now) > SystemTime::UNIX_EPOCH);
 /// ```
-pub fn from_unix_time(ts: sys::c_time_t) -> SystemTime {
+pub fn from_unix_time(ts: rrd_sys::time_t) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(ts as u64)
 }
 
@@ -80,7 +80,7 @@ pub fn path_to_str(path: &Path) -> Result<&str, RrdError> {
 }
 
 pub struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bool> {
-    pointers: Vec<*mut sys::c_char>,
+    pointers: Vec<*mut rrd_char>,
 }
 
 impl<const IS_NULL_TERMINATED: bool> Drop
@@ -112,11 +112,11 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
         Ok(Self { pointers })
     }
 
-    pub fn as_ptr(&self) -> *const *const sys::c_char {
+    pub fn as_ptr(&self) -> *mut *const rrd_char {
         if self.is_empty() {
-            null()
+            null_mut()
         } else {
-            self.pointers.as_ptr() as *const *const sys::c_char
+            self.pointers.as_ptr() as *mut *const rrd_char
         }
     }
 
@@ -139,30 +139,30 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
 ///
 /// # Examples
 /// ```
-/// use std::ptr::null;
+/// use std::ptr::null_mut;
 /// use rrd::util::ArrayOfStrings;
 ///
 /// let array = ArrayOfStrings::new(["one", "two"]).unwrap();
 /// assert_eq!(array.len(), 2);
 /// assert!(!array.is_empty());
-/// assert_ne!(array.as_ptr(), null());
+/// assert_ne!(array.as_ptr(), null_mut());
 ///
 /// unsafe {
-///     assert_ne!(*(array.as_ptr().add(0)), null());
-///     assert_ne!(*(array.as_ptr().add(1)), null());
+///     assert_ne!(*(array.as_ptr().add(0)), null_mut());
+///     assert_ne!(*(array.as_ptr().add(1)), null_mut());
 /// }
 /// ```
 ///
 /// An empty array returns `null` from `as_ptr()`.
 /// ```
-/// use std::ptr::null;
+/// use std::ptr::null_mut;
 /// use rrd::util::ArrayOfStrings;
 ///
 /// let source: &[&str] = &[];
 /// let array = ArrayOfStrings::new(source).unwrap();
 /// assert_eq!(array.len(), 0);
 /// assert!(array.is_empty());
-/// assert_eq!(array.as_ptr(), null());
+/// assert_eq!(array.as_ptr(), null_mut());
 /// ```
 pub type ArrayOfStrings = MaybeNullTerminatedArrayOfStrings<false>;
 
@@ -173,30 +173,30 @@ pub type ArrayOfStrings = MaybeNullTerminatedArrayOfStrings<false>;
 ///
 /// # Examples
 /// ```
-/// use std::ptr::null;
+/// use std::ptr::null_mut;
 /// use rrd::util::NullTerminatedArrayOfStrings;
 ///
 /// let array = NullTerminatedArrayOfStrings::new(["one", "two"]).unwrap();
 /// assert_eq!(array.len(), 2);
 /// assert!(!array.is_empty());
-/// assert_ne!(array.as_ptr(), null());
+/// assert_ne!(array.as_ptr(), null_mut());
 ///
 /// unsafe {
-///     assert_ne!(*(array.as_ptr().add(0)), null());
-///     assert_ne!(*(array.as_ptr().add(1)), null());
-///     assert_eq!(*(array.as_ptr().add(2)), null());
+///     assert_ne!(*(array.as_ptr().add(0)), null_mut());
+///     assert_ne!(*(array.as_ptr().add(1)), null_mut());
+///     assert_eq!(*(array.as_ptr().add(2)), null_mut());
 /// }
 /// ```
 ///
 /// An empty array returns `null` from `as_ptr()`.
 /// ```
-/// use std::ptr::null;
+/// use std::ptr::null_mut;
 /// use rrd::util::NullTerminatedArrayOfStrings;
 ///
 /// let source: &[&str] = &[];
 /// let array = NullTerminatedArrayOfStrings::new(source).unwrap();
 /// assert_eq!(array.len(), 0);
 /// assert!(array.is_empty());
-/// assert_eq!(array.as_ptr(), null());
+/// assert_eq!(array.as_ptr(), null_mut());
 /// ```
 pub type NullTerminatedArrayOfStrings = MaybeNullTerminatedArrayOfStrings<true>;

@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::sys;
+use rrd_sys::rrd_double;
 
 /// Adds a safe abstraction on top of the result of `rrd::fetch`.
 ///
@@ -11,7 +11,7 @@ use crate::sys;
 /// metadata (e.g. start, end, step and data sources).
 pub struct Data<T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     start: SystemTime,
     end: SystemTime,
@@ -23,7 +23,7 @@ where
 
 impl<T> Data<T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     pub fn new(
         start: SystemTime,
@@ -88,14 +88,14 @@ where
 
 pub struct DataSources<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     data: &'data Data<T>,
 }
 
 impl<'data, T> DataSources<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     pub fn len(&self) -> usize {
         self.data.names.len()
@@ -112,7 +112,7 @@ where
 
 impl<'data, T> IntoIterator for DataSources<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     type Item = DataSource<'data, T>;
 
@@ -125,7 +125,7 @@ where
 
 pub struct DataSourcesIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     data: &'data Data<T>,
     next_index: usize,
@@ -133,7 +133,7 @@ where
 
 impl<'data, T> DataSourcesIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     fn new(data: &'data Data<T>) -> Self {
         Self {
@@ -145,7 +145,7 @@ where
 
 impl<'data, T> Iterator for DataSourcesIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     type Item = DataSource<'data, T>;
 
@@ -169,11 +169,11 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for DataSourcesIter<'_, T> where T: Deref<Target = [sys::c_double]> {}
+impl<T> ExactSizeIterator for DataSourcesIter<'_, T> where T: Deref<Target = [rrd_double]> {}
 
 pub struct DataSource<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     data: &'data Data<T>,
     index: usize,
@@ -181,7 +181,7 @@ where
 
 impl<'data, T> DataSource<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     pub fn name(&self) -> &'data str {
         &self.data.names[self.index]
@@ -190,14 +190,14 @@ where
 
 pub struct Rows<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     data: &'data Data<T>,
 }
 
 impl<'data, T> Rows<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     pub fn len(&self) -> usize {
         self.data.row_count()
@@ -214,7 +214,7 @@ where
 
 impl<'data, T> IntoIterator for Rows<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     type Item = Row<'data>;
 
@@ -227,7 +227,7 @@ where
 
 pub struct RowsIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     data: &'data Data<T>,
     max_index: usize,
@@ -236,7 +236,7 @@ where
 
 impl<'data, T> RowsIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     fn new(data: &'data Data<T>) -> Self {
         Self {
@@ -247,9 +247,9 @@ where
     }
 }
 
-impl<'data, 'iterator, T> Iterator for RowsIter<'data, T>
+impl<'data, T> Iterator for RowsIter<'data, T>
 where
-    T: Deref<Target = [sys::c_double]>,
+    T: Deref<Target = [rrd_double]>,
 {
     type Item = Row<'data>;
 
@@ -268,7 +268,7 @@ where
     }
 }
 
-impl<T> ExactSizeIterator for RowsIter<'_, T> where T: Deref<Target = [sys::c_double]> {}
+impl<T> ExactSizeIterator for RowsIter<'_, T> where T: Deref<Target = [rrd_double]> {}
 
 pub struct Row<'data> {
     timestamp: SystemTime,
@@ -278,7 +278,7 @@ pub struct Row<'data> {
 impl<'data> Row<'data> {
     fn new<T>(data: &'data Data<T>, index: usize) -> Self
     where
-        T: Deref<Target = [sys::c_double]>,
+        T: Deref<Target = [rrd_double]>,
     {
         let timestamp = data.start() + data.step() * index as u32;
         let offset = data.names.len() * index;
