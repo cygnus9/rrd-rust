@@ -1,6 +1,6 @@
 [package]
 name = "rrd-sys"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
@@ -17,10 +17,13 @@ Oetiker's rrdtool (https://www.rrdtool.org/).
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = "0.71"
 
 [target.'cfg(macos)'.build-dependencies]
-pkg-config = "0.3.30"
+pkg-config = "0.3"
 
 [target.'cfg(unix)'.build-dependencies]
-pkg-config = "0.3.30"
+pkg-config = "0.3"
+
+[features]
+rrdsys_use_pregen = []
