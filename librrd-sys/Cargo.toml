@@ -24,6 +24,3 @@ pkg-config = "0.3"
 
 [target.'cfg(unix)'.build-dependencies]
 pkg-config = "0.3"
-
-[features]
-rrdsys_use_pregen = []

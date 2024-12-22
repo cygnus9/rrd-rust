@@ -8,7 +8,7 @@ pub use core::ffi::c_int as rrd_int;
 pub use core::ffi::c_ulong as rrd_ulong;
 pub use core::ffi::c_void as rrd_void;
 
-#[cfg(feature = "rrdsys_use_pregen")]
+#[cfg(rrdsys_use_pregen)]
 include!("pregen/bindings.rs");
-#[cfg(not(feature = "rrdsys_use_pregen"))]
+#[cfg(not(rrdsys_use_pregen))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
