@@ -1,11 +1,11 @@
 [package]
 name = "rrd-sys"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2021"
 authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
 keywords = ["rrd", "sys"]
-readme = "README.md"
+readme = "../README.md"
 documentation = "https://docs.rs/rrd"
 repository = "https://github.com/cygnus9/rrd-rust"
 homepage = "https://github.com/cygnus9/rrd-rust"
