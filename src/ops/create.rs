@@ -8,9 +8,11 @@ use std::{
 use rrd_sys::{rrd_int, rrd_ulong};
 
 use crate::{
-    error::{RrdError, RrdResult},
-    get_error,
-    util::{self, path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
+    error::{
+        return_code_to_result,
+        RrdResult
+    },
+    util::{self, path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings}
 };
 
 pub fn create(
@@ -46,8 +48,5 @@ pub fn create(
             args.as_ptr(),
         )
     };
-    match rc {
-        0 => Ok(()),
-        _ => Err(RrdError::LibRrdError(get_error())),
-    }
+    return_code_to_result(rc)
 }

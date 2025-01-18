@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Mark Swaanenburg"]
 license = "MIT/Apache-2.0"
 keywords = ["rrd"]
+categories = ["api-bindings"]
 readme = "README.md"
 documentation = "https://docs.rs/rrd"
 repository = "https://github.com/cygnus9/rrd-rust"
@@ -25,3 +26,6 @@ thiserror = "2.0"
 
 [dev-dependencies]
 chrono = "0.4"
+tempfile = "3.15.0"
+anyhow = "1.0.95"
+itertools = "0.14.0"

@@ -32,7 +32,7 @@ where
         names: Vec<String>,
         data: T,
     ) -> Self {
-        assert!(data.len() % names.len() == 0);
+        assert_eq!(data.len() % names.len(), 0);
         let row_count = data.len() / names.len();
         Self {
             start,
@@ -71,7 +71,7 @@ where
     ///     vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
     /// );
     ///
-    /// assert!(data.row_count() == 3)
+    /// assert_eq!(data.row_count(), 3)
     /// ```
     pub fn row_count(&self) -> usize {
         self.row_count
@@ -283,7 +283,7 @@ impl<'data> Row<'data> {
         let timestamp = data.start() + data.step() * index as u32;
         let offset = data.names.len() * index;
         let values = &data.data.as_ref()[offset..offset + data.names.len()];
-        assert!(values.len() == data.names.len());
+        assert_eq!(values.len(), data.names.len());
         let cells = data
             .names
             .iter()

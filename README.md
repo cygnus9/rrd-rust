@@ -50,3 +50,7 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in `rrd` by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+#### Checking with multiple OSs
+
+Run `./scripts/check-with-different-versions.sh` to run tests in several different linux systems with varying librrd versions.

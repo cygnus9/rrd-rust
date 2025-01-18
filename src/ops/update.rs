@@ -4,9 +4,11 @@ use bitflags::bitflags;
 use rrd_sys::rrd_int;
 
 use crate::{
-    error::{RrdError, RrdResult},
-    get_error,
-    util::{path_to_str, ArrayOfStrings},
+    error::{
+        return_code_to_result,
+        RrdResult
+    },
+    util::{path_to_str, ArrayOfStrings}
 };
 
 bitflags! {
@@ -36,8 +38,5 @@ pub fn update(
             args.as_ptr(),
         )
     };
-    match rc {
-        0 => Ok(()),
-        _ => Err(RrdError::LibRrdError(get_error())),
-    }
+    return_code_to_result(rc)
 }

@@ -1,46 +1,118 @@
-use std::collections::HashMap;
-use std::ffi::{CStr, CString};
+use crate::{
+    error::{get_rrd_error, RrdError, RrdResult},
+    util::path_to_str,
+};
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    path::Path,
+};
 
-pub fn info(filename: &str) -> HashMap<String, String> {
-    let filename = CString::new(filename).expect("CString::new failed");
+pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
+    let filename = CString::new(path_to_str(filename)?)?;
 
     let result_ptr = unsafe { rrd_sys::rrd_info_r(filename.as_ptr()) };
-    let mut dict = HashMap::new();
-    let mut current = result_ptr;
+    if result_ptr.is_null() {
+        return Err(get_rrd_error().unwrap_or_else(|| {
+            RrdError::Internal("No info data, but no librrd error".to_string())
+        }));
+    }
+
+    Ok(build_info_map(result_ptr))
+}
+
+/// Value in the map returned from [`info()`]
+#[derive(Debug, PartialEq, PartialOrd)]
+#[allow(missing_docs)]
+pub enum InfoValue {
+    Value(f64),
+    Count(u64),
+    String(String),
+    Int(i32),
+    Blob(Vec<u8>),
+}
+
+impl From<f64> for InfoValue {
+    fn from(value: f64) -> Self {
+        Self::Value(value)
+    }
+}
+impl From<u64> for InfoValue {
+    fn from(value: u64) -> Self {
+        Self::Count(value)
+    }
+}
+impl From<String> for InfoValue {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+impl From<&str> for InfoValue {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+impl From<i32> for InfoValue {
+    fn from(value: i32) -> Self {
+        Self::Int(value)
+    }
+}
+impl From<Vec<u8>> for InfoValue {
+    fn from(value: Vec<u8>) -> Self {
+        Self::Blob(value)
+    }
+}
+
+/// Must only be called on a non-null pointer.
+///
+/// # Panics
+///
+/// Will panic if `info` is null.
+pub(crate) fn build_info_map(info: *mut rrd_sys::rrd_info_t) -> HashMap<String, InfoValue> {
+    assert!(!info.is_null());
+
+    let mut map = HashMap::new();
+    let mut current = info;
     while !current.is_null() {
         let key_cstr = unsafe { CStr::from_ptr((*current).key) };
         let key = key_cstr.to_string_lossy().into_owned();
 
-        let value = match unsafe { &(*current).type_ } {
-            &rrd_sys::rrd_info_type_RD_I_VAL => {
-                let value = unsafe { (*current).value.u_val };
-                format!("{:.2}", value) // Handle value as a double with 2 decimal places
+        let value = match *unsafe { &(*current).type_ } {
+            rrd_sys::rrd_info_type_RD_I_VAL => (unsafe { (*current).value.u_val }).into(),
+            rrd_sys::rrd_info_type_RD_I_CNT => {
+                // on windows, ffi::c_ulong is u32
+                #[allow(clippy::useless_conversion)]
+                u64::from(unsafe { (*current).value.u_cnt }).into()
             }
-            &rrd_sys::rrd_info_type_RD_I_CNT => {
-                let value = unsafe { (*current).value.u_cnt };
-                format!("{}", value) // Handle value as an unsigned int
-            }
-            &rrd_sys::rrd_info_type_RD_I_STR => {
+            rrd_sys::rrd_info_type_RD_I_STR => {
                 let str_cstr = unsafe { CStr::from_ptr((*current).value.u_str) };
-                str_cstr.to_string_lossy().into_owned() // Handle value as a string
+                // Realistically people will probably just use `to_string_lossy` anyway,
+                // so not exposing the Result seems suitable.
+                str_cstr.to_string_lossy().into_owned().into()
             }
-            &rrd_sys::rrd_info_type_RD_I_INT => {
-                let value = unsafe { (*current).value.u_int };
-                format!("{}", value) // Handle value as an int
+            rrd_sys::rrd_info_type_RD_I_INT => (unsafe { (*current).value.u_int }).into(),
+            rrd_sys::rrd_info_type_RD_I_BLO => {
+                let slice = unsafe {
+                    let blob = (*current).value.u_blo;
+                    std::slice::from_raw_parts(
+                        blob.ptr.cast_const(),
+                        blob.size.try_into().expect("Implausibly huge blob"),
+                    )
+                };
+
+                slice.to_vec().into()
             }
-            &rrd_sys::rrd_info_type_RD_I_BLO => {
-                // Skip handling blobs for simplicity
-                continue;
-            }
-            _ => {
-                continue;
+            t => {
+                panic!("Unexpected info type {t} - version mismatch, or memory corruption?")
             }
         };
 
-        dict.insert(key, value);
+        map.insert(key, value);
 
         current = unsafe { (*current).next };
     }
 
-    dict
+    unsafe { rrd_sys::rrd_info_free(info) }
+
+    map
 }
