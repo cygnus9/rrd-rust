@@ -1,10 +1,10 @@
-use std::path::Path;
-use std::time::Duration;
+use rrd::{ops::create, ConsolidationFn};
+use std::{path::Path, time::Duration};
 
 fn main() {
     let filename = Path::new("db.rrd");
 
-    rrd::create(
+    create::create(
         filename,
         Duration::from_secs(1),
         chrono::Utc::now(),
@@ -12,11 +12,21 @@ fn main() {
         &[],
         None,
         &[
-            "DS:volt:GAUGE:300:0:24000",
-            "DS:amps:GAUGE:300:0:24000",
-            "DS:watts:COMPUTE:volt,amps,*",
-            "RRA:AVERAGE:0.5:1:864000",
+            create::DataSource::gauge(
+                create::DataSourceName::new("volt"),
+                300,
+                Some(0.0),
+                Some(24000.0),
+            ),
+            create::DataSource::gauge(
+                create::DataSourceName::new("amps"),
+                300,
+                Some(0.0),
+                Some(24000.0),
+            ),
+            create::DataSource::compute(create::DataSourceName::new("watts"), "volt,amps,*"),
         ],
+        &[create::Archive::new(ConsolidationFn::Avg, 0.5, 1, 86400).unwrap()],
     )
     .expect("Failed to create db");
 

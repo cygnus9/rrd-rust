@@ -1,13 +1,13 @@
-use std::f64::consts::PI;
-use std::path::Path;
-use std::time::Duration;
+use std::{f64::consts::PI, path::Path, time::Duration};
+
+use rrd::{ops::create, ConsolidationFn};
 
 fn main() {
     let filename = Path::new("db.rrd");
     let start = chrono::Utc::now();
     let end = start + chrono::TimeDelta::seconds(300);
 
-    rrd::create(
+    create::create(
         filename,
         Duration::from_secs(1),
         start - chrono::TimeDelta::seconds(1),
@@ -15,10 +15,22 @@ fn main() {
         &[],
         None,
         &[
-            "DS:sin:GAUGE:10:-1:1",
-            "DS:cos:GAUGE:10:-1:1",
-            "RRA:AVERAGE:0.5:1:300",
-            "RRA:AVERAGE:0.5:5:300",
+            create::DataSource::gauge(
+                create::DataSourceName::new("sin"),
+                10,
+                Some(-1.0),
+                Some(1.0),
+            ),
+            create::DataSource::gauge(
+                create::DataSourceName::new("cos"),
+                10,
+                Some(-1.0),
+                Some(1.0),
+            ),
+        ],
+        &[
+            create::Archive::new(ConsolidationFn::Avg, 0.5, 1, 300).unwrap(),
+            create::Archive::new(ConsolidationFn::Avg, 0.5, 5, 300).unwrap(),
         ],
     )
     .expect("Failed to create db");

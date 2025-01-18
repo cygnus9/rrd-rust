@@ -19,6 +19,9 @@ pub enum RrdError {
     /// A miscellaneous error in this library
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
 }
 
 pub type RrdResult<T> = Result<T, RrdError>;
@@ -44,5 +47,16 @@ pub(crate) fn get_rrd_error() -> Option<RrdError> {
             rrd_sys::rrd_clear_error();
             Some(RrdError::LibRrdError(string))
         }
+    }
+}
+
+/// Indicates that a Rust wrapper type detected an invalid argument
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid argument: {0}")]
+pub struct InvalidArgument(pub(crate) &'static str);
+
+impl From<InvalidArgument> for RrdError {
+    fn from(value: InvalidArgument) -> Self {
+        RrdError::InvalidArgument(value.0.to_string())
     }
 }

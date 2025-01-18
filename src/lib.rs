@@ -24,3 +24,24 @@ impl TimestampExt for Timestamp {
         self.timestamp()
     }
 }
+
+/// How to aggregate primary data points in a RRA
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConsolidationFn {
+    Avg,
+    Min,
+    Max,
+    Last,
+}
+
+impl ConsolidationFn {
+    pub(crate) fn as_arg_str(&self) -> &str {
+        match self {
+            ConsolidationFn::Avg => "AVERAGE",
+            ConsolidationFn::Min => "MIN",
+            ConsolidationFn::Max => "MAX",
+            ConsolidationFn::Last => "LAST",
+        }
+    }
+}
