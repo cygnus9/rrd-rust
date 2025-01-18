@@ -1,11 +1,11 @@
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 fn main() {
     let rc = rrd::create(
         Path::new("db.rrd"),
         Duration::from_secs(1),
-        SystemTime::now(),
+        chrono::Utc::now(),
         false,
         &[],
         None,

@@ -1,42 +1,7 @@
 use rrd_sys::rrd_char;
-use std::ffi::CString;
-use std::path::Path;
-use std::ptr::null_mut;
-use std::result::Result;
-use std::time::{Duration, SystemTime, SystemTimeError};
+use std::{ffi::CString, path::Path, ptr::null_mut, result::Result};
 
 use crate::error::{RrdError, RrdResult};
-
-/// Convert a `SystemTime` to `time_t` (a.k.a. seconds since unix epoch)
-///
-/// # Examples
-/// ```
-/// use std::time::SystemTime;
-/// use rrd::util::to_unix_time;
-///
-/// let now = SystemTime::now();
-/// assert!(to_unix_time(now).unwrap() > 0);
-/// ```
-pub fn to_unix_time(ts: SystemTime) -> Result<rrd_sys::time_t, SystemTimeError> {
-    ts.duration_since(SystemTime::UNIX_EPOCH)
-        .map(|d| d.as_secs() as rrd_sys::time_t)
-}
-
-/// Convert a `time_t` (a.k.a. seconds since epoch) to a `SystemTime`
-///
-/// # Examples
-/// ```
-/// use std::ptr::null_mut;
-/// use std::time::SystemTime;
-/// use libc::time;
-/// use rrd::util::from_unix_time;
-///
-/// let now = unsafe { time(null_mut()) };
-/// assert!(from_unix_time(now) > SystemTime::UNIX_EPOCH);
-/// ```
-pub fn from_unix_time(ts: rrd_sys::time_t) -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_secs(ts as u64)
-}
 
 /// Conveniently convert a `Path` to a `&str`
 ///

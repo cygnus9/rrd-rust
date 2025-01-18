@@ -23,6 +23,7 @@ rrd-sys = { version = "0.1.0", path = "librrd-sys" }
 bitflags = "2.6"
 libc = "0.2"
 thiserror = "2.0"
+chrono = "0.4.39"
 
 [dev-dependencies]
 chrono = "0.4"

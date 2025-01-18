@@ -4,11 +4,8 @@ use bitflags::bitflags;
 use rrd_sys::rrd_int;
 
 use crate::{
-    error::{
-        return_code_to_result,
-        RrdResult
-    },
-    util::{path_to_str, ArrayOfStrings}
+    error::{return_code_to_result, RrdResult},
+    util::{path_to_str, ArrayOfStrings},
 };
 
 bitflags! {

@@ -7,12 +7,12 @@ RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
 ENV PATH="$PATH:/root/.cargo/bin"
-RUN rustup component add clippy
+RUN rustup component add clippy rustfmt
 
 RUN mkdir -p /rrd/ && cd rrd && mkdir src librrd-sys
 WORKDIR /rrd
 
-CMD cargo build --all-targets -q && cargo test -q && cargo clippy --all-targets -- -Dwarnings
+CMD ./scripts/quick-check.sh
 
 RUN touch src/lib.rs
 COPY librrd-sys librrd-sys
