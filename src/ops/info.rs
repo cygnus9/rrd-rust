@@ -22,7 +22,7 @@ pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
 }
 
 /// Value in the map returned from [`info()`]
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[allow(missing_docs)]
 pub enum InfoValue {
     Value(f64),
@@ -30,6 +30,60 @@ pub enum InfoValue {
     String(String),
     Int(i32),
     Blob(Vec<u8>),
+}
+
+impl InfoValue {
+    /// Returns `Some` if this is an `InfoValue::Value`, `None` otherwise
+    pub fn into_value(self) -> Option<f64> {
+        match self {
+            InfoValue::Value(v) => Some(v),
+            InfoValue::Count(_) | InfoValue::String(_) | InfoValue::Int(_) | InfoValue::Blob(_) => {
+                None
+            }
+        }
+    }
+
+    /// Returns `Some` if this is an `InfoValue::Count`, `None` otherwise
+    pub fn into_count(self) -> Option<u64> {
+        match self {
+            InfoValue::Count(c) => Some(c),
+            InfoValue::Value(_) | InfoValue::String(_) | InfoValue::Int(_) | InfoValue::Blob(_) => {
+                None
+            }
+        }
+    }
+
+    /// Returns `Some` if this is an `InfoValue::String`, `None` otherwise
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            InfoValue::String(s) => Some(s),
+            InfoValue::Value(_) | InfoValue::Count(_) | InfoValue::Int(_) | InfoValue::Blob(_) => {
+                None
+            }
+        }
+    }
+
+    /// Returns `Some` if this is an `InfoValue::Int`, `None` otherwise
+    pub fn into_int(self) -> Option<i32> {
+        match self {
+            InfoValue::Int(i) => Some(i),
+            InfoValue::Value(_)
+            | InfoValue::Count(_)
+            | InfoValue::String(_)
+            | InfoValue::Blob(_) => None,
+        }
+    }
+
+    /// Returns `Some` if this is an `InfoValue::Blob`, `None` otherwise
+    pub fn into_blob(self) -> Option<Vec<u8>> {
+        match self {
+            InfoValue::Blob(b) => Some(b),
+            InfoValue::Value(_)
+            | InfoValue::Count(_)
+            | InfoValue::String(_)
+            | InfoValue::Int(_) => None,
+        }
+    }
 }
 
 impl From<f64> for InfoValue {

@@ -1,12 +1,10 @@
+// TODO some of these operations aren't thread safe
 pub mod data;
 pub mod error;
+pub mod ops;
 pub mod util;
 
-pub mod ops;
-
-pub use ops::create::create;
 pub use ops::fetch::fetch;
-pub use ops::graph::graph;
 pub use ops::info::info;
 
 // since it's in the public API, expose it for users

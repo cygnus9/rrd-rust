@@ -12,11 +12,11 @@ fn main() {
 
     create::create(
         filename,
-        Duration::from_secs(1),
         start - chrono::TimeDelta::seconds(1),
+        Duration::from_secs(1),
         false,
-        &[],
         None,
+        &[],
         &[
             create::DataSource::gauge(
                 create::DataSourceName::new("sin"),

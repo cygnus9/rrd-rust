@@ -4,11 +4,11 @@ use std::{path::Path, time::Duration};
 fn main() {
     let rc = create::create(
         Path::new("db.rrd"),
-        Duration::from_secs(1),
         chrono::Utc::now(),
+        Duration::from_secs(1),
         false,
-        &[],
         None,
+        &[],
         &[create::DataSource::gauge(
             create::DataSourceName::new("watts"),
             300,

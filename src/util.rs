@@ -1,7 +1,7 @@
+use crate::error::RrdError;
+use itertools::Itertools;
 use rrd_sys::rrd_char;
 use std::{ffi::CString, fmt, path::Path, ptr, result::Result};
-
-use crate::error::{RrdError, RrdResult};
 
 /// Conveniently convert a `Path` to a `&str`
 ///
@@ -51,20 +51,17 @@ pub(crate) struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bo
 }
 
 impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_TERMINATED> {
-    pub fn new<T, U>(strings: T) -> RrdResult<Self>
+    #[cfg(test)]
+    fn new<T, U>(strings: T) -> crate::error::RrdResult<Self>
     where
         T: IntoIterator<Item = U>,
         U: Into<String>,
     {
-        let cstrings = strings
+        strings
             .into_iter()
             .map(|s| CString::new(s.into()))
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut pointers = cstrings.iter().map(|cs| cs.as_ptr()).collect::<Vec<_>>();
-        if IS_NULL_TERMINATED {
-            pointers.push(ptr::null());
-        }
-        Ok(Self { cstrings, pointers })
+            .collect::<Result<Self, _>>()
+            .map_err(|e| e.into())
     }
 
     pub fn as_ptr(&self) -> *mut *const rrd_char {
@@ -87,6 +84,19 @@ impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_T
 impl<const T: bool> fmt::Debug for MaybeNullTerminatedArrayOfStrings<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.cstrings.iter()).finish()
+    }
+}
+
+impl<const IS_NULL_TERMINATED: bool> FromIterator<CString>
+    for MaybeNullTerminatedArrayOfStrings<IS_NULL_TERMINATED>
+{
+    fn from_iter<T: IntoIterator<Item = CString>>(iter: T) -> Self {
+        let cstrings = iter.into_iter().collect_vec();
+        let mut pointers = cstrings.iter().map(|cs| cs.as_ptr()).collect_vec();
+        if IS_NULL_TERMINATED {
+            pointers.push(ptr::null());
+        }
+        MaybeNullTerminatedArrayOfStrings { cstrings, pointers }
     }
 }
 
