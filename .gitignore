@@ -14,3 +14,6 @@ Cargo.lock
 
 # Files from (various) ide's and editors
 /.vscode
+/.idea
+
+/tmp

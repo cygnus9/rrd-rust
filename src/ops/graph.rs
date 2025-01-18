@@ -1,22 +1,21 @@
-use crate::{
-    error::{RrdError, RrdResult},
-    get_error,
+use crate::error::{
+    return_code_to_result,
+    RrdResult
 };
 use rrd_sys::FILE;
 use std::ffi::{c_char, c_int, CString};
 
 pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
-    let c_filename = CString::new(filename).unwrap();
-    let arg_ptrs: Vec<_> = args
+    let c_filename = CString::new(filename)?;
+    let args: Vec<_> = args
         .iter()
-        .map(|s| CString::new(*s).unwrap().into_raw())
-        .collect();
+        .map(|s| CString::new(*s))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let rrd_graph_str = CString::new("rrd_graph").unwrap();
-    let rrd_graph_str_ptr = rrd_graph_str.into_raw();
+    let rrd_graph_str = CString::new("rrd_graph")?;
 
-    let mut argv = vec![rrd_graph_str_ptr, c_filename.into_raw()];
-    argv.extend(arg_ptrs.iter().map(|&s| s as *mut c_char));
+    let mut argv = vec![rrd_graph_str.as_ptr(), c_filename.as_ptr()];
+    argv.extend(args.iter().map(|s| s.as_ptr()));
 
     let argc = argv.len() as c_int;
 
@@ -27,10 +26,11 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
     let mut ymin: f64 = 0.0;
     let mut ymax: f64 = 0.0;
 
-    let res = unsafe {
+    let rc = unsafe {
         rrd_sys::rrd_graph(
             argc,
-            argv.as_mut_ptr(),
+            // cast to allow different systems that expect *mut/*const pointers
+            argv.as_mut_ptr() as _,
             &mut prdata,
             &mut xsize,
             &mut ysize,
@@ -39,8 +39,11 @@ pub fn graph(filename: &str, args: Vec<&str>) -> RrdResult<()> {
             &mut ymax,
         )
     };
-    match res {
-        0 => Ok(()),
-        _ => Err(RrdError::LibRrdError(get_error())),
-    }
+
+    // prove that the strings live past the graph call
+    drop(rrd_graph_str);
+    drop(args);
+    drop(c_filename);
+
+    return_code_to_result(rc)
 }

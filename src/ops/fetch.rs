@@ -10,10 +10,12 @@ use std::{
 use rrd_sys::{rrd_double, rrd_ulong, rrd_void};
 
 use crate::{
+    error::{
+        return_code_to_result,
+        RrdResult
+    },
     data::Data,
-    error::{RrdError, RrdResult},
-    get_error,
-    util::{self, path_to_str},
+    util::{self, path_to_str}
 };
 
 pub fn fetch(
@@ -49,9 +51,7 @@ pub fn fetch(
             &mut data,
         )
     };
-    if rc != 0 {
-        return Err(RrdError::LibRrdError(get_error()));
-    }
+    return_code_to_result(rc)?;
 
     let names = unsafe {
         let names: Vec<_> = slice::from_raw_parts(ds_names, ds_count as usize)
