@@ -1,5 +1,5 @@
 use rrd_sys::rrd_char;
-use std::{ffi::CString, path::Path, ptr::null_mut, result::Result};
+use std::{ffi::CString, fmt, path::Path, ptr, result::Result};
 
 use crate::error::{RrdError, RrdResult};
 
@@ -44,124 +44,110 @@ pub fn path_to_str(path: &Path) -> Result<&str, RrdError> {
     path.to_str().ok_or(RrdError::PathEncodingError)
 }
 
-pub struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bool> {
-    pointers: Vec<*mut rrd_char>,
-}
-
-impl<const IS_NULL_TERMINATED: bool> Drop
-    for MaybeNullTerminatedArrayOfStrings<IS_NULL_TERMINATED>
-{
-    fn drop(&mut self) {
-        for p in self.pointers.iter().take_while(|p| !p.is_null()) {
-            unsafe {
-                let _ = CString::from_raw(*p);
-            }
-        }
-    }
+pub(crate) struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bool> {
+    /// Keep the strings so they can be dropped
+    cstrings: Vec<CString>,
+    pointers: Vec<*const rrd_char>,
 }
 
 impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_TERMINATED> {
     pub fn new<T, U>(strings: T) -> RrdResult<Self>
     where
         T: IntoIterator<Item = U>,
-        U: AsRef<str>,
+        U: Into<String>,
     {
-        let mut pointers = strings
+        let cstrings = strings
             .into_iter()
-            .map(|s| CString::new(s.as_ref()))
-            .map(|r| r.map(|s| s.into_raw()))
+            .map(|s| CString::new(s.into()))
             .collect::<Result<Vec<_>, _>>()?;
+        let mut pointers = cstrings.iter().map(|cs| cs.as_ptr()).collect::<Vec<_>>();
         if IS_NULL_TERMINATED {
-            pointers.push(null_mut());
+            pointers.push(ptr::null());
         }
-        Ok(Self { pointers })
+        Ok(Self { cstrings, pointers })
     }
 
     pub fn as_ptr(&self) -> *mut *const rrd_char {
         if self.is_empty() {
-            null_mut()
+            ptr::null_mut()
         } else {
-            self.pointers.as_ptr() as *mut *const rrd_char
+            self.pointers.as_ptr().cast_mut()
         }
     }
 
     pub fn len(&self) -> usize {
-        if IS_NULL_TERMINATED {
-            self.pointers.len() - 1
-        } else {
-            self.pointers.len()
-        }
+        self.cstrings.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.cstrings.is_empty()
+    }
+}
+
+impl<const T: bool> fmt::Debug for MaybeNullTerminatedArrayOfStrings<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.cstrings.iter()).finish()
     }
 }
 
 /// Represents an array of pointers to nul-terminated strings.
 ///
 /// These should be used with C APIs that also take a length parameter.
-///
-/// # Examples
-/// ```
-/// use std::ptr::null_mut;
-/// use rrd::util::ArrayOfStrings;
-///
-/// let array = ArrayOfStrings::new(["one", "two"]).unwrap();
-/// assert_eq!(array.len(), 2);
-/// assert!(!array.is_empty());
-/// assert_ne!(array.as_ptr(), null_mut());
-///
-/// unsafe {
-///     assert_ne!(*(array.as_ptr().add(0)), null_mut());
-///     assert_ne!(*(array.as_ptr().add(1)), null_mut());
-/// }
-/// ```
-///
-/// An empty array returns `null` from `as_ptr()`.
-/// ```
-/// use std::ptr::null_mut;
-/// use rrd::util::ArrayOfStrings;
-///
-/// let source: &[&str] = &[];
-/// let array = ArrayOfStrings::new(source).unwrap();
-/// assert_eq!(array.len(), 0);
-/// assert!(array.is_empty());
-/// assert_eq!(array.as_ptr(), null_mut());
-/// ```
-pub type ArrayOfStrings = MaybeNullTerminatedArrayOfStrings<false>;
+pub(crate) type ArrayOfStrings = MaybeNullTerminatedArrayOfStrings<false>;
 
 /// Represents a nul-terminated array of pointers to nul-terminated strings.
 ///
 /// These should be used with C APIs that don't take a length parameter but
 /// expect the last pointer in the array to be null.
-///
-/// # Examples
-/// ```
-/// use std::ptr::null_mut;
-/// use rrd::util::NullTerminatedArrayOfStrings;
-///
-/// let array = NullTerminatedArrayOfStrings::new(["one", "two"]).unwrap();
-/// assert_eq!(array.len(), 2);
-/// assert!(!array.is_empty());
-/// assert_ne!(array.as_ptr(), null_mut());
-///
-/// unsafe {
-///     assert_ne!(*(array.as_ptr().add(0)), null_mut());
-///     assert_ne!(*(array.as_ptr().add(1)), null_mut());
-///     assert_eq!(*(array.as_ptr().add(2)), null_mut());
-/// }
-/// ```
-///
-/// An empty array returns `null` from `as_ptr()`.
-/// ```
-/// use std::ptr::null_mut;
-/// use rrd::util::NullTerminatedArrayOfStrings;
-///
-/// let source: &[&str] = &[];
-/// let array = NullTerminatedArrayOfStrings::new(source).unwrap();
-/// assert_eq!(array.len(), 0);
-/// assert!(array.is_empty());
-/// assert_eq!(array.as_ptr(), null_mut());
-/// ```
-pub type NullTerminatedArrayOfStrings = MaybeNullTerminatedArrayOfStrings<true>;
+pub(crate) type NullTerminatedArrayOfStrings = MaybeNullTerminatedArrayOfStrings<true>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr::null_mut;
+
+    #[test]
+    fn array_all_ptrs_non_null() {
+        let array = ArrayOfStrings::new(["one", "two"]).unwrap();
+        assert_eq!(array.len(), 2);
+        assert!(!array.is_empty());
+        assert_ne!(array.as_ptr(), null_mut());
+
+        unsafe {
+            assert_ne!(*(array.as_ptr().add(0)), null_mut());
+            assert_ne!(*(array.as_ptr().add(1)), null_mut());
+        }
+    }
+
+    #[test]
+    fn array_empty_is_null() {
+        let source: &[String] = &[];
+        let array = ArrayOfStrings::new(source).unwrap();
+        assert_eq!(array.len(), 0);
+        assert!(array.is_empty());
+        assert_eq!(array.as_ptr(), null_mut());
+    }
+
+    #[test]
+    fn null_terminated_array_all_ptrs_non_null() {
+        let array = NullTerminatedArrayOfStrings::new(["one", "two"]).unwrap();
+        assert_eq!(array.len(), 2);
+        assert!(!array.is_empty());
+        assert_ne!(array.as_ptr(), null_mut());
+
+        unsafe {
+            assert_ne!(*(array.as_ptr().add(0)), null_mut());
+            assert_ne!(*(array.as_ptr().add(1)), null_mut());
+            assert_eq!(*(array.as_ptr().add(2)), null_mut());
+        }
+    }
+
+    #[test]
+    fn null_terminated_array_empty_is_null() {
+        let source: &[String] = &[];
+        let array = NullTerminatedArrayOfStrings::new(source).unwrap();
+        assert_eq!(array.len(), 0);
+        assert!(array.is_empty());
+        assert_eq!(array.as_ptr(), null_mut());
+    }
+}

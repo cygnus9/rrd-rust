@@ -24,6 +24,7 @@ bitflags = "2.6"
 libc = "0.2"
 thiserror = "2.0"
 chrono = "0.4.39"
+log = "0.4.25"
 
 [dev-dependencies]
 chrono = "0.4"
