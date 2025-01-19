@@ -1,6 +1,9 @@
 use std::{f64::consts::PI, path::Path, time::Duration};
 
-use rrd::{ops::create, ConsolidationFn};
+use rrd::{
+    ops::{create, update, update::update_all},
+    ConsolidationFn,
+};
 
 fn main() {
     let filename = Path::new("db.rrd");
@@ -36,13 +39,16 @@ fn main() {
     .expect("Failed to create db");
 
     for offset in 0..300 {
-        let ts = start + Duration::from_secs(offset);
         let x = offset as f64 * PI / 300f64;
-        let sin_value = x.sin();
-        let cos_value = x.cos();
-
-        let s = format!("{}:{sin_value:.3}:{cos_value:.3}", ts.timestamp());
-        rrd::update(filename, None, rrd::ExtraFlags::empty(), &[&s]).unwrap();
+        update_all(
+            filename,
+            update::ExtraFlags::empty(),
+            &[(
+                (start + Duration::from_secs(offset)).into(),
+                &[update::Datum::Float(x.sin()), update::Datum::Float(x.cos())],
+            )],
+        )
+        .unwrap();
     }
 
     let rc = rrd::fetch(filename, "AVERAGE", start, end, Duration::from_secs(1));

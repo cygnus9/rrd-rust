@@ -8,7 +8,6 @@ pub use ops::create::create;
 pub use ops::fetch::fetch;
 pub use ops::graph::graph;
 pub use ops::info::info;
-pub use ops::update::{update, ExtraFlags};
 
 // since it's in the public API, expose it for users
 pub use chrono;

@@ -1,4 +1,7 @@
-use rrd::{ops::create, ConsolidationFn};
+use rrd::{
+    ops::{create, update},
+    ConsolidationFn,
+};
 use std::{path::Path, time::Duration};
 
 fn main() {
@@ -30,7 +33,11 @@ fn main() {
     )
     .expect("Failed to create db");
 
-    let rc = rrd::update(filename, None, rrd::ExtraFlags::empty(), &["N:235:12.3"]);
+    let rc = update::update_all(
+        filename,
+        update::ExtraFlags::empty(),
+        &[(update::BatchTime::Now, &[235.into(), 12.3.into()])],
+    );
     match rc {
         Ok(_) => println!("Ok"),
         Err(err) => println!("Not ok: {err}"),
