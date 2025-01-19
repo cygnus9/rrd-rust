@@ -22,10 +22,11 @@ runs:
       env:
         CARGO_TERM_COLOR: always
     - name: Check docs
-      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+      run: cargo doc --no-deps
       shell: bash
       env:
         CARGO_TERM_COLOR: always
+        RUSTDOCFLAGS: -D warnings
     - name: Run tests
       run: cargo test --verbose
       shell: bash
