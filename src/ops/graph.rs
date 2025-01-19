@@ -1,7 +1,4 @@
-use crate::error::{
-    return_code_to_result,
-    RrdResult
-};
+use crate::error::{return_code_to_result, RrdResult};
 use rrd_sys::FILE;
 use std::ffi::{c_char, c_int, CString};
 

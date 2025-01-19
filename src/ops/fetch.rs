@@ -4,25 +4,23 @@ use std::{
     path::Path,
     ptr::null_mut,
     slice,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use rrd_sys::{rrd_double, rrd_ulong, rrd_void};
 
 use crate::{
-    error::{
-        return_code_to_result,
-        RrdResult
-    },
     data::Data,
-    util::{self, path_to_str}
+    error::{return_code_to_result, RrdResult},
+    util::path_to_str,
+    Timestamp, TimestampExt,
 };
 
 pub fn fetch(
     filename: &Path,
     cf: &str,
-    start: SystemTime,
-    end: SystemTime,
+    start: Timestamp,
+    end: Timestamp,
     step: Duration,
 ) -> RrdResult<Data<Array>> {
     // in
@@ -30,9 +28,9 @@ pub fn fetch(
     let cf = CString::new(cf)?;
 
     // in/out
-    let mut start = util::to_unix_time(start).unwrap();
-    let mut end = util::to_unix_time(end).unwrap();
-    let mut step = step.as_secs() as rrd_ulong;
+    let mut start_tt = start.as_time_t();
+    let mut end_tt = end.as_time_t();
+    let mut step_tt = step.as_secs() as rrd_ulong;
 
     // out
     let mut ds_count = 0;
@@ -43,9 +41,9 @@ pub fn fetch(
         rrd_sys::rrd_fetch_r(
             filename.as_ptr(),
             cf.as_ptr(),
-            &mut start,
-            &mut end,
-            &mut step,
+            &mut start_tt,
+            &mut end_tt,
+            &mut step_tt,
             &mut ds_count,
             &mut ds_names,
             &mut data,
@@ -66,16 +64,18 @@ pub fn fetch(
         names
     };
 
-    let rows = (end - start) as usize / step as usize + 1;
+    let rows = (end_tt - start_tt) as usize / step_tt as usize + 1;
     let data = Array {
         ptr: data,
         len: rows * ds_count as usize,
     };
 
+    // we need u64, but windows c_ulong is u32
+    #[allow(clippy::useless_conversion)]
     Ok(Data::new(
-        util::from_unix_time(start),
-        util::from_unix_time(end),
-        Duration::from_secs(step as u64),
+        start,
+        end,
+        Duration::from_secs(step_tt.into()),
         names,
         data,
     ))

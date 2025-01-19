@@ -1,24 +1,17 @@
-use std::{
-    ffi::CString,
-    path::Path,
-    ptr::null,
-    time::{Duration, SystemTime},
-};
+use std::{ffi::CString, path::Path, ptr::null, time::Duration};
 
 use rrd_sys::{rrd_int, rrd_ulong};
 
 use crate::{
-    error::{
-        return_code_to_result,
-        RrdResult
-    },
-    util::{self, path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings}
+    error::{return_code_to_result, RrdResult},
+    util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
+    Timestamp, TimestampExt,
 };
 
 pub fn create(
     filename: &Path,
     pdp_step: Duration,
-    last_up: SystemTime,
+    last_up: Timestamp,
     no_overwrite: bool,
     sources: &[&Path],
     template: Option<&Path>,
@@ -40,7 +33,7 @@ pub fn create(
         rrd_sys::rrd_create_r2(
             filename.as_ptr(),
             pdp_step.as_secs() as rrd_ulong,
-            util::to_unix_time(last_up).unwrap(),
+            last_up.as_time_t(),
             if no_overwrite { 1 } else { 0 },
             sources.as_ptr(),
             template.map_or(null(), |s| s.as_ptr()),

@@ -1,19 +1,16 @@
 use std::f64::consts::PI;
 use std::path::Path;
-use std::time::{Duration, SystemTime};
-
-use chrono::{DateTime, Local};
-use rrd::util::to_unix_time;
+use std::time::Duration;
 
 fn main() {
     let filename = Path::new("db.rrd");
-    let start = SystemTime::now();
-    let end = start + Duration::from_secs(300);
+    let start = chrono::Utc::now();
+    let end = start + chrono::TimeDelta::seconds(300);
 
     rrd::create(
         filename,
         Duration::from_secs(1),
-        start - Duration::from_secs(1),
+        start - chrono::TimeDelta::seconds(1),
         false,
         &[],
         None,
@@ -27,12 +24,12 @@ fn main() {
     .expect("Failed to create db");
 
     for offset in 0..300 {
-        let ts = to_unix_time(start + Duration::from_secs(offset)).unwrap();
+        let ts = start + Duration::from_secs(offset);
         let x = offset as f64 * PI / 300f64;
         let sin_value = x.sin();
         let cos_value = x.cos();
 
-        let s = format!("{ts}:{sin_value:.3}:{cos_value:.3}");
+        let s = format!("{}:{sin_value:.3}:{cos_value:.3}", ts.timestamp());
         rrd::update(filename, None, rrd::ExtraFlags::empty(), &[&s]).unwrap();
     }
 
@@ -40,8 +37,8 @@ fn main() {
     match rc {
         Ok(data) => {
             println!("Ok");
-            println!("  Start: {}", to_datetime(data.start()));
-            println!("  End: {}", to_datetime(data.end()));
+            println!("  Start: {}", data.start());
+            println!("  End: {}", data.end());
             println!("  Step: {:?}", data.step());
             println!("  Rows: {}", data.row_count());
 
@@ -56,7 +53,7 @@ fn main() {
                 println!(
                     "    #{:03}: {} - {:.03}, {:.03}",
                     i,
-                    to_datetime(row.timestamp()),
+                    row.timestamp(),
                     row[0].value,
                     row[1].value
                 );
@@ -64,8 +61,4 @@ fn main() {
         }
         Err(err) => println!("Not ok: {err}"),
     }
-}
-
-fn to_datetime(ts: SystemTime) -> DateTime<Local> {
-    ts.into()
 }

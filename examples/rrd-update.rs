@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 fn main() {
     let filename = Path::new("db.rrd");
@@ -7,7 +7,7 @@ fn main() {
     rrd::create(
         filename,
         Duration::from_secs(1),
-        SystemTime::now(),
+        chrono::Utc::now(),
         false,
         &[],
         None,

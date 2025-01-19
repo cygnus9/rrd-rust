@@ -1,8 +1,6 @@
-use std::{
-    ops::Deref,
-    time::{Duration, SystemTime},
-};
+use std::{ops::Deref, time::Duration};
 
+use crate::Timestamp;
 use rrd_sys::rrd_double;
 
 /// Adds a safe abstraction on top of the result of `rrd::fetch`.
@@ -13,8 +11,8 @@ pub struct Data<T>
 where
     T: Deref<Target = [rrd_double]>,
 {
-    start: SystemTime,
-    end: SystemTime,
+    start: Timestamp,
+    end: Timestamp,
     step: Duration,
     names: Vec<String>,
     data: T,
@@ -26,8 +24,8 @@ where
     T: Deref<Target = [rrd_double]>,
 {
     pub fn new(
-        start: SystemTime,
-        end: SystemTime,
+        start: Timestamp,
+        end: Timestamp,
         step: Duration,
         names: Vec<String>,
         data: T,
@@ -44,11 +42,11 @@ where
         }
     }
 
-    pub fn start(&self) -> SystemTime {
+    pub fn start(&self) -> Timestamp {
         self.start
     }
 
-    pub fn end(&self) -> SystemTime {
+    pub fn end(&self) -> Timestamp {
         self.end
     }
 
@@ -60,12 +58,13 @@ where
     ///
     /// # Examples
     /// ```
-    /// use std::time::{Duration, SystemTime};
+    /// use std::time::{Duration};
     /// use rrd::data::Data;
+    /// use rrd::Timestamp;
     ///
     /// let data = Data::new(
-    ///     SystemTime::UNIX_EPOCH,
-    ///     SystemTime::UNIX_EPOCH,
+    ///     Timestamp::UNIX_EPOCH,
+    ///     Timestamp::UNIX_EPOCH,
     ///     Duration::from_secs(1),
     ///     vec![String::from("ds1"), String::from("ds2")],
     ///     vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
@@ -271,7 +270,7 @@ where
 impl<T> ExactSizeIterator for RowsIter<'_, T> where T: Deref<Target = [rrd_double]> {}
 
 pub struct Row<'data> {
-    timestamp: SystemTime,
+    timestamp: Timestamp,
     cells: Vec<Cell<'data>>,
 }
 
@@ -296,7 +295,7 @@ impl<'data> Row<'data> {
         Self { timestamp, cells }
     }
 
-    pub fn timestamp(&self) -> SystemTime {
+    pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
 }

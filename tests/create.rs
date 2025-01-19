@@ -6,7 +6,7 @@ use std::{collections, time};
 fn create_all_ds_types() -> anyhow::Result<()> {
     let tempdir = tempfile::tempdir()?;
     let rrd_path = tempdir.path().join("rrd");
-    let now = time::SystemTime::now();
+    let now = chrono::Utc::now();
     create(
         &rrd_path,
         time::Duration::from_secs(1),
@@ -110,10 +110,7 @@ fn create_all_ds_types() -> anyhow::Result<()> {
         ("rra[0].xff", 0.50_f64.into()),
         ("rrd_version", "0005".into()),
         ("step", 1_u64.into()),
-        (
-            "last_update",
-            now.duration_since(time::UNIX_EPOCH)?.as_secs().into(),
-        ),
+        ("last_update", u64::try_from(now.timestamp())?.into()),
         ("filename", rrd_path.to_string_lossy().into_owned().into()),
     ]
     .into_iter()
