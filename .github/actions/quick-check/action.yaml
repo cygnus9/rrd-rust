@@ -1,11 +1,10 @@
 name: Quick check
 description: Build and verify the package
-env:
-  CARGO_TERM_COLOR: always
-  RUSTDOCFLAGS: -D warnings
 runs:
   using: composite
   steps:
+    - name: Setup env
+      run: echo "CARGO_TERM_COLOR=always" >> "${GITHUB_OUTPUT}"
     - name: Install rust
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
@@ -21,7 +20,7 @@ runs:
       run: cargo build --verbose
       shell: bash
     - name: Check docs
-      run: cargo doc --no-deps
+      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
       shell: bash
     - name: Run tests
       run: cargo test --verbose
