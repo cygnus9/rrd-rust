@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
 
 jobs:
   ubuntu:
@@ -20,7 +21,6 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
-      RUSTDOCFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
@@ -50,19 +50,21 @@ jobs:
         version: ["39", "40", "41", "42"]
     steps:
     - uses: actions/checkout@v3
-    - name: Install development environment
-      run: dnf group install -qy --refresh c-development
     - name: Install dependencies
-      run: dnf install -qy rrdtool-devel curl clang
+      run: |
+        dnf group install -qy --refresh c-development
+        dnf install -qy rrdtool-devel curl clang
     - name: Install rust
-      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
     - name: Install rust components
-      run: $HOME/.cargo/bin/rustup component add clippy rustfmt
+      run: rustup component add clippy rustfmt
     - name: Check formatting
-      run: $HOME/.cargo/bin/cargo fmt --check
+      run: cargo fmt --check
     - name: Build
-      run: $HOME/.cargo/bin/cargo build --verbose
+      run: cargo build --verbose
     - name: Check docs
-      run: RUSTDOCFLAGS="-D warnings" $HOME/.cargo/bin/cargo doc --no-deps
+      run: cargo doc --no-deps
     - name: Run tests
-      run: $HOME/.cargo/bin/cargo test --verbose
+      run: cargo test --verbose
