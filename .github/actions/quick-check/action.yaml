@@ -7,13 +7,19 @@ runs:
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      shell: bash
     - name: Install rust components
       run: rustup component add clippy rustfmt
+      shell: bash
     - name: Check formatting
       run: cargo fmt --check
+      shell: bash
     - name: Build
       run: cargo build --verbose
+      shell: bash
     - name: Check docs
       run: cargo doc --no-deps
+      shell: bash
     - name: Run tests
       run: cargo test --verbose
+      shell: bash
