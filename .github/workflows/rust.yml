@@ -30,13 +30,16 @@ jobs:
   fedora:
     runs-on: ubuntu-latest
     container:
-      image: fedora:42
+      image: fedora:${{ matrix.version }}
+    strategy:
+      matrix:
+        version: [39, 40, 41, 42]
     steps:
     - uses: actions/checkout@v3
     - name: Install development environment
-      run: dnf group install -qy c-development
+      run: dnf group install -qy --refresh c-development
     - name: Install dependencies
-      run: dnf install -qy --refresh rrdtool-devel curl clang
+      run: dnf install -qy rrdtool-devel curl clang
     - name: Install rust
       run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
     - name: Install rust components
