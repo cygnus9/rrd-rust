@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "actions-test" ]
   pull_request:
     branches: [ "main" ]
 
@@ -10,9 +10,13 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  ubuntu:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
 
     steps:
     - uses: actions/checkout@v3
