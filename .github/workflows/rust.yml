@@ -11,20 +11,32 @@ env:
 
 jobs:
   ubuntu:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.version }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
+        version: [20.04, 22.04, 24.04, 24.10, 25.04]
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TZ: Etc/UTC
+      RUSTDOCFLAGS: -D warnings
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: sudo apt-get install librrd-dev
+      run: apt-get install -qy librrd-dev curl build-essential pkg-config libclang-dev
+    - name: Install rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - name: Install rust components
+      run: rustup component add clippy rustfmt
     - name: Check formatting
       run: cargo fmt --check
     - name: Build
       run: cargo build --verbose
     - name: Check docs
-      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+      run: cargo doc --no-deps
     - name: Run tests
       run: cargo test --verbose
   fedora:
