@@ -6,23 +6,37 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  build:
-
+  ubuntu:
     runs-on: ubuntu-latest
-
+    container:
+      image: ubuntu:${{ matrix.version }}
+    strategy:
+      matrix:
+        version: ["20.04", "22.04", "24.04", "24.10", "25.04"]
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TZ: Etc/UTC
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
-      run: sudo apt-get install librrd-dev
-    - name: Check formatting
-      run: cargo fmt --check
-    - name: Build
-      run: cargo build --verbose
-    - name: Check docs
-      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-    - name: Run tests
-      run: cargo test --verbose
+      run: |
+        apt-get update
+        apt-get install -qy librrd-dev curl build-essential pkg-config libclang-dev
+    - name: Quick check
+      uses: ./.github/actions/quick-check
+  fedora:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:${{ matrix.version }}
+    strategy:
+      matrix:
+        version: ["39", "40", "41", "42"]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        dnf group install -qy --refresh c-development
+        dnf install -qy rrdtool-devel curl clang
+    - name: Quick check
+      uses: ./.github/actions/quick-check
