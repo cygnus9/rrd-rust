@@ -5,6 +5,7 @@ runs:
   steps:
     - name: Setup env
       run: echo "CARGO_TERM_COLOR=always" >> "${GITHUB_OUTPUT}"
+      shell: bash
     - name: Install rust
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
