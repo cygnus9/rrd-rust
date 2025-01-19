@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rrd::{create, ops::info};
+use rrd::{ops::create, ops::info, ConsolidationFn};
 use std::{collections, time};
 
 #[test]
@@ -7,7 +7,7 @@ fn create_all_ds_types() -> anyhow::Result<()> {
     let tempdir = tempfile::tempdir()?;
     let rrd_path = tempdir.path().join("rrd");
     let now = chrono::Utc::now();
-    create(
+    create::create(
         &rrd_path,
         time::Duration::from_secs(1),
         now,
@@ -15,15 +15,45 @@ fn create_all_ds_types() -> anyhow::Result<()> {
         &[],
         None,
         &[
-            "DS:gauge:GAUGE:300:0.0:1000.0",
-            "DS:counter:COUNTER:300:0:1000",
-            "DS:dcounter:DCOUNTER:300:0.0:1000.0",
-            "DS:derive:DERIVE:300:0:1000",
-            "DS:dderive:DDERIVE:300:0.0:1000",
-            "DS:absolute:ABSOLUTE:300:0:1000",
-            "DS:compute:COMPUTE:gauge,counter,+",
-            "RRA:AVERAGE:0.5:6:10",
+            create::DataSource::gauge(
+                create::DataSourceName::new("gauge"),
+                300,
+                Some(0.0),
+                Some(1000.0),
+            ),
+            create::DataSource::counter(
+                create::DataSourceName::new("counter"),
+                300,
+                Some(0),
+                Some(1000),
+            ),
+            create::DataSource::dcounter(
+                create::DataSourceName::new("dcounter"),
+                300,
+                Some(0.0),
+                Some(1000.0),
+            ),
+            create::DataSource::derive(
+                create::DataSourceName::new("derive"),
+                300,
+                Some(0),
+                Some(1000),
+            ),
+            create::DataSource::dderive(
+                create::DataSourceName::new("dderive"),
+                300,
+                Some(0.0),
+                Some(1000.0),
+            ),
+            create::DataSource::absolute(
+                create::DataSourceName::new("absolute"),
+                300,
+                Some(0),
+                Some(1000),
+            ),
+            create::DataSource::compute(create::DataSourceName::new("compute"), "gauge,counter,+"),
         ],
+        &[create::Archive::new(ConsolidationFn::Avg, 0.5, 6, 10).unwrap()],
     )?;
 
     let mut info = info::info(&rrd_path)?;
