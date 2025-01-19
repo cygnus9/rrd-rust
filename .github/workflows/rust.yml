@@ -40,12 +40,12 @@ jobs:
     - name: Install rust
       run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
     - name: Install rust components
-      run: /root/.cargo/bin/rustup component add clippy rustfmt
+      run: $HOME/.cargo/bin/rustup component add clippy rustfmt
     - name: Check formatting
-      run: /root/.cargo/bin/cargo fmt --check
+      run: $HOME/.cargo/bin/cargo fmt --check
     - name: Build
-      run: /root/.cargo/bin/cargo build --verbose
+      run: $HOME/.cargo/bin/cargo build --verbose
     - name: Check docs
-      run: RUSTDOCFLAGS="-D warnings" /root/.cargo/bin/cargo doc --no-deps
+      run: RUSTDOCFLAGS="-D warnings" $HOME/.cargo/bin/cargo doc --no-deps
     - name: Run tests
-      run: /root/.cargo/bin/cargo test --verbose
+      run: $HOME/.cargo/bin/cargo test --verbose
