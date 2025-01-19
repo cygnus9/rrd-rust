@@ -1,5 +1,8 @@
 name: Quick check
 description: Build and verify the package
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
 runs:
   using: composite
   steps:
