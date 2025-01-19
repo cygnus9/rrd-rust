@@ -1,0 +1,19 @@
+name: Quick check
+description: Build and verify the package
+runs:
+  using: composite
+  steps:
+    - name: Install rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - name: Install rust components
+      run: rustup component add clippy rustfmt
+    - name: Check formatting
+      run: cargo fmt --check
+    - name: Build
+      run: cargo build --verbose
+    - name: Check docs
+      run: cargo doc --no-deps
+    - name: Run tests
+      run: cargo test --verbose
