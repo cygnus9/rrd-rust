@@ -11,13 +11,10 @@ env:
 
 jobs:
   ubuntu:
-
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
-
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
@@ -30,3 +27,25 @@ jobs:
       run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
     - name: Run tests
       run: cargo test --verbose
+  fedora:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:42
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install development environment
+      run: dnf group install -qy c-development
+    - name: Install dependencies
+      run: dnf install -qy --refresh rrdtool-devel curl clang
+    - name: Install rust
+      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y
+    - name: Install rust components
+      run: /root/.cargo/bin/rustup component add clippy rustfmt
+    - name: Check formatting
+      run: /root/.cargo/bin/cargo fmt --check
+    - name: Build
+      run: /root/.cargo/bin/cargo build --verbose
+    - name: Check docs
+      run: RUSTDOCFLAGS="-D warnings" /root/.cargo/bin/cargo doc --no-deps
+    - name: Run tests
+      run: /root/.cargo/bin/cargo test --verbose
