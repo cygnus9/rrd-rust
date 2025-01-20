@@ -51,7 +51,13 @@ fn main() {
         .unwrap();
     }
 
-    let rc = rrd::fetch(filename, "AVERAGE", start, end, Duration::from_secs(1));
+    let rc = rrd::fetch(
+        filename,
+        ConsolidationFn::Avg,
+        start,
+        end,
+        Duration::from_secs(1),
+    );
     match rc {
         Ok(data) => {
             println!("Ok");
@@ -72,8 +78,8 @@ fn main() {
                     "    #{:03}: {} - {:.03}, {:.03}",
                     i,
                     row.timestamp(),
-                    row[0].value,
-                    row[1].value
+                    row[0],
+                    row[1]
                 );
             }
         }

@@ -1,16 +1,12 @@
-use std::{ops::Deref, time::Duration};
-
 use crate::Timestamp;
 use rrd_sys::rrd_double;
+use std::{fmt, ops::Deref, time::Duration};
 
 /// Adds a safe abstraction on top of the result of `rrd::fetch`.
 ///
 /// Object of this type provide access to both the data and the
 /// metadata (e.g. start, end, step and data sources).
-pub struct Data<T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
+pub struct Data<T> {
     start: Timestamp,
     end: Timestamp,
     step: Duration,
@@ -170,10 +166,10 @@ where
 
 impl<T> ExactSizeIterator for DataSourcesIter<'_, T> where T: Deref<Target = [rrd_double]> {}
 
-pub struct DataSource<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
+/// A data source in [`Data`].
+///
+/// Conceptually, this is a column defining the order of values in a [`Row`].
+pub struct DataSource<'data, T> {
     data: &'data Data<T>,
     index: usize,
 }
@@ -187,10 +183,8 @@ where
     }
 }
 
-pub struct Rows<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
+/// An iterator over the [`Row`]s in [`Data`].
+pub struct Rows<'data, T> {
     data: &'data Data<T>,
 }
 
@@ -215,7 +209,7 @@ impl<'data, T> IntoIterator for Rows<'data, T>
 where
     T: Deref<Target = [rrd_double]>,
 {
-    type Item = Row<'data>;
+    type Item = Row<'data, T>;
 
     type IntoIter = RowsIter<'data, T>;
 
@@ -224,10 +218,17 @@ where
     }
 }
 
-pub struct RowsIter<'data, T>
+impl<T> fmt::Debug for Rows<'_, T>
 where
-    T: Deref<Target = [rrd_double]>,
+    T: Deref<Target = [rrd_double]> + fmt::Debug,
 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+/// Iteratover over [`Row`]s in [`Data`]
+pub struct RowsIter<'data, T> {
     data: &'data Data<T>,
     max_index: usize,
     next_index: usize,
@@ -250,7 +251,7 @@ impl<'data, T> Iterator for RowsIter<'data, T>
 where
     T: Deref<Target = [rrd_double]>,
 {
-    type Item = Row<'data>;
+    type Item = Row<'data, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.next_index < self.max_index {
@@ -269,45 +270,90 @@ where
 
 impl<T> ExactSizeIterator for RowsIter<'_, T> where T: Deref<Target = [rrd_double]> {}
 
-pub struct Row<'data> {
+/// A sequence of values for a particular timestamp.
+pub struct Row<'data, T> {
+    data: &'data Data<T>,
+    data_offset: usize,
     timestamp: Timestamp,
-    cells: Vec<Cell<'data>>,
 }
 
-impl<'data> Row<'data> {
-    fn new<T>(data: &'data Data<T>, index: usize) -> Self
-    where
-        T: Deref<Target = [rrd_double]>,
-    {
-        let timestamp = data.start() + data.step() * index as u32;
-        let offset = data.names.len() * index;
-        let values = &data.data.as_ref()[offset..offset + data.names.len()];
-        assert_eq!(values.len(), data.names.len());
-        let cells = data
-            .names
-            .iter()
-            .zip(values)
-            .map(|(name, value)| Cell {
-                name,
-                value: *value,
-            })
-            .collect();
-        Self { timestamp, cells }
+impl<'data, T> Row<'data, T>
+where
+    T: Deref<Target = [rrd_double]>,
+{
+    fn new(data: &'data Data<T>, row_index: usize) -> Self {
+        Self {
+            data,
+            data_offset: data.names.len() * row_index,
+            timestamp: data.start()
+                + data.step() * row_index.try_into().expect("Row index exceeds u32"),
+        }
     }
 
     pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
-}
 
-impl<'data> Deref for Row<'data> {
-    type Target = [Cell<'data>];
+    /// The values for this row, in the order of the data source names in the encompassing [`Data`].
+    ///
+    /// To access values and DS names together, see [`Self::iter_cells`].
+    pub fn as_slice(&self) -> &[f64] {
+        &self.data.data.as_ref()[self.data_offset..self.data_offset + self.data.names.len()]
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.cells
+    /// Iterate over the [`Cell`]s for this row's values.
+    pub fn iter_cells(&self) -> impl Iterator<Item = Cell> {
+        self.data
+            .names
+            .iter()
+            .zip(self.as_slice())
+            .map(|(name, value)| Cell {
+                name,
+                value: *value,
+            })
     }
 }
 
+impl<T> Deref for Row<'_, T>
+where
+    T: Deref<Target = [rrd_double]>,
+{
+    type Target = [rrd_double];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<T> fmt::Debug for Row<'_, T>
+where
+    T: Deref<Target = [rrd_double]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct RowDataDebug<'d> {
+            row_data: &'d [rrd_double],
+        }
+        impl fmt::Debug for RowDataDebug<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list().entries(self.row_data.iter()).finish()
+            }
+        }
+
+        f.debug_struct("Row")
+            .field("ts", &self.timestamp)
+            .field("ts_int", &self.timestamp.timestamp())
+            .field(
+                "data",
+                &RowDataDebug {
+                    row_data: self.as_slice(),
+                },
+            )
+            .finish()
+    }
+}
+
+/// Includes the corresponding DS name for each value in a row.
+#[derive(Debug)]
 pub struct Cell<'data> {
     pub name: &'data str,
     pub value: f64,
