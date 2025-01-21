@@ -5,9 +5,10 @@ use crate::{
     Timestamp,
 };
 use bitflags::bitflags;
+use itertools::Itertools;
 use log::debug;
 use rrd_sys::rrd_int;
-use std::{ffi::CString, fmt::Write, path::Path, ptr::null};
+use std::{borrow, ffi::CString, fmt::Write, path::Path, ptr::null};
 
 bitflags! {
     pub struct ExtraFlags : rrd_int {
@@ -22,18 +23,16 @@ bitflags! {
 /// Each batch of data must have the same number of data points.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdupdate.en.html>.
-pub fn update_all<'a, D, I>(filename: &Path, extra_flags: ExtraFlags, data: I) -> RrdResult<()>
+pub fn update_all<'a, D, B, I>(filename: &Path, extra_flags: ExtraFlags, data: I) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
-    I: IntoIterator<Item = &'a (BatchTime, D)>,
+    B: borrow::Borrow<(BatchTime, D)>,
+    I: IntoIterator<Item = B>,
 {
     let filename = CString::new(path_to_str(filename)?)?;
     let args = build_datum_args(data, None)?;
 
-    debug!(
-        "Update: file={} extra_flags=0x{extra_flags:02x} args={args:?}",
-        filename.to_string_lossy(),
-    );
+    debug!("Update: file={filename:?} extra_flags=0x{extra_flags:02x} args={args:?}",);
 
     let rc = unsafe {
         rrd_sys::rrd_updatex_r(
@@ -58,7 +57,7 @@ where
 ///  Each batch of data must have the same number of data points.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdupdate.en.html>.
-pub fn update<'a, D, I>(
+pub fn update<'a, D, B, I>(
     filename: &Path,
     ds_names: &[&str],
     extra_flags: ExtraFlags,
@@ -66,24 +65,15 @@ pub fn update<'a, D, I>(
 ) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
-    I: IntoIterator<Item = &'a (BatchTime, D)>,
+    B: borrow::Borrow<(BatchTime, D)>,
+    I: IntoIterator<Item = B>,
 {
     let filename = CString::new(path_to_str(filename)?)?;
-
-    let template = CString::new(ds_names.iter().fold(String::new(), |mut accum, t| {
-        if !accum.is_empty() {
-            accum.push(':');
-        }
-        accum.push_str(t);
-        accum
-    }))?;
-
+    let template = CString::new(ds_names.iter().join(":"))?;
     let args = build_datum_args(data, Some(ds_names.len()))?;
 
     debug!(
-        "Update: file={} template={} extra_flags=0x{extra_flags:02x} args={args:?}",
-        filename.to_string_lossy(),
-        template.to_string_lossy()
+        "Update: file={filename:?} template={template:?} extra_flags=0x{extra_flags:02x} args={args:?}",
     );
 
     let rc = unsafe {
@@ -98,19 +88,54 @@ where
     return_code_to_result(rc)
 }
 
+/// The value for an individual DS at a particular timestamp
+pub enum Datum {
+    Unspecified,
+    Int(u64),
+    Float(f64),
+}
+
+impl From<u64> for Datum {
+    fn from(value: u64) -> Self {
+        Self::Int(value)
+    }
+}
+
+impl From<f64> for Datum {
+    fn from(value: f64) -> Self {
+        Self::Float(value)
+    }
+}
+
+/// Timestamp to use for a batch of values
+pub enum BatchTime {
+    /// Let RRDTool determine the time from the system clock.
+    Now,
+    /// Use a specific time
+    Specified(Timestamp),
+}
+
+impl From<Timestamp> for BatchTime {
+    fn from(value: Timestamp) -> Self {
+        Self::Specified(value)
+    }
+}
+
 /// Ensure that all batches match `expected_len`, if set, otherwise ensure they are all the same
 /// len.
-fn build_datum_args<'a, D, I>(
+fn build_datum_args<'a, D, B, I>(
     batches: I,
     mut expected_len: Option<usize>,
 ) -> RrdResult<ArrayOfStrings>
 where
     D: AsRef<[Datum]> + 'a,
-    I: IntoIterator<Item = &'a (BatchTime, D)>,
+    B: borrow::Borrow<(BatchTime, D)>,
+    I: IntoIterator<Item = B>,
 {
-    let args = batches
+    batches
         .into_iter()
-        .map(|(ts, data)| {
+        .map(|batch| {
+            let (ts, data) = batch.borrow();
             let slice = data.as_ref();
             let expected = expected_len.get_or_insert(slice.len());
             if slice.len() != *expected {
@@ -147,42 +172,88 @@ where
                 }
             }
 
-            Ok(timestamp_arg)
+            CString::new(timestamp_arg).map_err(|e| e.into())
         })
-        .collect::<Result<Vec<_>, RrdError>>()?;
-
-    ArrayOfStrings::new(args)
+        .collect::<Result<ArrayOfStrings, _>>()
 }
 
-/// The value for an individual DS at a particular timestamp
-pub enum Datum {
-    Unspecified,
-    Int(u64),
-    Float(f64),
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ops::create;
+    use crate::ConsolidationFn;
+    use std::time;
 
-impl From<u64> for Datum {
-    fn from(value: u64) -> Self {
-        Self::Int(value)
+    #[test]
+    fn can_call_update_with_tuple_refs() -> anyhow::Result<()> {
+        let tempdir = tempfile::tempdir()?;
+        let rrd_path = tempdir.path().join("data.rrd");
+
+        create(&rrd_path)?;
+
+        call_update_with_tuple_refs(
+            &rrd_path,
+            &[(
+                Timestamp::from_timestamp(920804460, 0).unwrap().into(),
+                [100_u64.into()],
+            )],
+        )?;
+
+        Ok(())
     }
-}
 
-impl From<f64> for Datum {
-    fn from(value: f64) -> Self {
-        Self::Float(value)
+    #[test]
+    fn can_call_update_with_tuple_vals() -> anyhow::Result<()> {
+        let tempdir = tempfile::tempdir()?;
+        let rrd_path = tempdir.path().join("data.rrd");
+
+        create(&rrd_path)?;
+
+        call_update_with_tuple_vals(
+            &rrd_path,
+            [(
+                Timestamp::from_timestamp(920804460, 0).unwrap().into(),
+                [100_u64.into()],
+            )],
+        )?;
+
+        Ok(())
     }
-}
 
-/// Timestamp to use for a batch of values
-pub enum BatchTime {
-    /// Let RRDTool determine the time from the system clock.
-    Now,
-    /// Use a specific time
-    Specified(Timestamp),
-}
+    fn create(rrd_path: &Path) -> anyhow::Result<()> {
+        create::create(
+            rrd_path,
+            Timestamp::from_timestamp(920804400, 0).unwrap(),
+            time::Duration::from_secs(300),
+            true,
+            None,
+            &[],
+            &[create::DataSource::counter(
+                create::DataSourceName::new("speed"),
+                600,
+                None,
+                None,
+            )],
+            &[
+                create::Archive::new(ConsolidationFn::Avg, 0.5, 1, 24)?,
+                create::Archive::new(ConsolidationFn::Avg, 0.5, 6, 10)?,
+            ],
+        )?;
 
-impl From<Timestamp> for BatchTime {
-    fn from(value: Timestamp) -> Self {
-        Self::Specified(value)
+        Ok(())
+    }
+
+    fn call_update_with_tuple_refs<'a, I>(rrd_path: &Path, data: I) -> RrdResult<()>
+    where
+        I: IntoIterator<Item = &'a (BatchTime, [Datum; 1])>,
+    {
+        update_all(rrd_path, ExtraFlags::empty(), data)
+    }
+
+    fn call_update_with_tuple_vals(
+        rrd_path: &Path,
+        data: impl IntoIterator<Item = (BatchTime, [Datum; 1])>,
+    ) -> RrdResult<()> {
+        update_all(rrd_path, ExtraFlags::empty(), data)
     }
 }

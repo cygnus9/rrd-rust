@@ -1,5 +1,13 @@
+use crate::{
+    data::Data,
+    error::{return_code_to_result, RrdResult},
+    util::path_to_str,
+    ConsolidationFn, Timestamp, TimestampExt,
+};
+use rrd_sys::{rrd_double, rrd_void};
 use std::{
     ffi::{CStr, CString},
+    fmt,
     ops::Deref,
     path::Path,
     ptr::null_mut,
@@ -7,30 +15,26 @@ use std::{
     time::Duration,
 };
 
-use rrd_sys::{rrd_double, rrd_ulong, rrd_void};
-
-use crate::{
-    data::Data,
-    error::{return_code_to_result, RrdResult},
-    util::path_to_str,
-    Timestamp, TimestampExt,
-};
-
 pub fn fetch(
     filename: &Path,
-    cf: &str,
+    cf: ConsolidationFn,
     start: Timestamp,
     end: Timestamp,
-    step: Duration,
+    resolution: Duration,
 ) -> RrdResult<Data<Array>> {
     // in
     let filename = CString::new(path_to_str(filename)?)?;
-    let cf = CString::new(cf)?;
+    let cf = CString::new(cf.as_arg_str())?;
 
-    // in/out
-    let mut start_tt = start.as_time_t();
-    let mut end_tt = end.as_time_t();
-    let mut step_tt = step.as_secs() as rrd_ulong;
+    // in/out - clobber var names to avoid accidentally using original input values
+    let mut start = start.as_time_t();
+    let mut end = end.as_time_t();
+    // windows c_ulong is u32
+    #[allow(clippy::useless_conversion)]
+    let mut resolution = resolution
+        .as_secs()
+        .try_into()
+        .expect("Implausibly long resolution");
 
     // out
     let mut ds_count = 0;
@@ -41,9 +45,9 @@ pub fn fetch(
         rrd_sys::rrd_fetch_r(
             filename.as_ptr(),
             cf.as_ptr(),
-            &mut start_tt,
-            &mut end_tt,
-            &mut step_tt,
+            &mut start,
+            &mut end,
+            &mut resolution,
             &mut ds_count,
             &mut ds_names,
             &mut data,
@@ -51,8 +55,24 @@ pub fn fetch(
     };
     return_code_to_result(rc)?;
 
+    assert!(!ds_names.is_null());
+    assert!(!data.is_null());
+    assert!(resolution > 0);
+
+    // Move forward one step -- first timestamp's data is included in the time that ends one step ahead
+    let start = Timestamp::from_timestamp(
+        start
+            .checked_add(i64::try_from(resolution).expect("Resolution i64 overflow"))
+            .expect("Start overflow"),
+        0,
+    )
+    .expect("Impossible start");
+    let end = Timestamp::from_timestamp(end, 0).expect("Impossible end");
+
+    let ds_count_usize = ds_count.try_into().expect("Count overflow");
+
     let names = unsafe {
-        let names: Vec<_> = slice::from_raw_parts(ds_names, ds_count as usize)
+        let names: Vec<_> = slice::from_raw_parts(ds_names, ds_count_usize)
             .iter()
             .map(|p| {
                 let s = CStr::from_ptr(*p).to_string_lossy().into_owned();
@@ -64,10 +84,18 @@ pub fn fetch(
         names
     };
 
-    let rows = (end_tt - start_tt) as usize / step_tt as usize + 1;
+    let rows = (usize::try_from(
+        end.timestamp()
+            .checked_sub(start.timestamp())
+            .expect("Negative time range"),
+    )
+    .expect("Time range overflow")
+        / usize::try_from(resolution).expect("Resolution usize overflow"))
+    .checked_add(1)
+    .expect("Num rows overflow");
     let data = Array {
         ptr: data,
-        len: rows * ds_count as usize,
+        len: rows.checked_mul(ds_count_usize).expect("Data len overflow"),
     };
 
     // we need u64, but windows c_ulong is u32
@@ -75,12 +103,13 @@ pub fn fetch(
     Ok(Data::new(
         start,
         end,
-        Duration::from_secs(step_tt.into()),
+        Duration::from_secs(resolution.into()),
         names,
         data,
     ))
 }
 
+/// Contiguous data for the output of `fetch()`.
 pub struct Array {
     ptr: *const rrd_double,
     len: usize,
@@ -99,5 +128,11 @@ impl Deref for Array {
 
     fn deref(&self) -> &Self::Target {
         unsafe { slice::from_raw_parts(self.ptr, self.len) }
+    }
+}
+
+impl fmt::Debug for Array {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.deref().iter()).finish()
     }
 }

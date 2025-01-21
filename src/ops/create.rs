@@ -1,52 +1,54 @@
-use std::{ffi::CString, path::Path, ptr::null, time::Duration};
-
 use crate::error::InvalidArgument;
 use crate::{
     error::{return_code_to_result, RrdResult},
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
     ConsolidationFn, Timestamp, TimestampExt,
 };
+use log::debug;
+use std::{ffi::CString, path::Path, ptr::null, time::Duration};
 
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdcreate.en.html>.
 #[allow(clippy::too_many_arguments)]
 pub fn create<'a>(
     filename: &Path,
-    pdp_step: Duration,
-    last_up: Timestamp,
+    start: Timestamp,
+    step: Duration,
     no_overwrite: bool,
-    sources: &[&Path],
     template: Option<&Path>,
+    sources: &[&Path],
     data_sources: impl IntoIterator<Item = &'a DataSource>,
     round_robin_archives: impl IntoIterator<Item = &'a Archive>,
 ) -> RrdResult<()> {
-    let filename = CString::new(path_to_str(filename)?)?;
     let sources = sources
         .iter()
-        .map(|p| path_to_str(p))
-        .collect::<Result<Vec<_>, _>>()
-        .and_then(NullTerminatedArrayOfStrings::new)?;
+        .map(|p| path_to_str(p).and_then(|s| CString::new(s).map_err(|e| e.into())))
+        .collect::<Result<NullTerminatedArrayOfStrings, _>>()?;
+    let filename = CString::new(path_to_str(filename)?)?;
     let template = match template {
         None => None,
         Some(p) => Some(CString::new(path_to_str(p)?)?),
     };
 
-    let args = ArrayOfStrings::new(
-        data_sources
-            .into_iter()
-            .map(DataSource::as_arg_string)
-            .chain(round_robin_archives.into_iter().map(Archive::as_arg_string)),
-    )?;
+    let args = data_sources
+        .into_iter()
+        .map(DataSource::as_arg_string)
+        .chain(round_robin_archives.into_iter().map(Archive::as_arg_string))
+        .map(CString::new)
+        .collect::<Result<ArrayOfStrings, _>>()?;
+
+    debug!(
+        "Create: file={filename:?} start={} step={} no_overwrite={no_overwrite} template={template:?} sources={sources:?} args={args:?}",
+        start.timestamp(),
+        step.as_secs()
+    );
 
     let rc = unsafe {
         rrd_sys::rrd_create_r2(
             filename.as_ptr(),
             #[allow(clippy::useless_conversion)]
             // windows c_ulong is u32
-            pdp_step
-                .as_secs()
-                .try_into()
-                .expect("step too big for c_ulong"),
-            last_up.as_time_t(),
+            step.as_secs().try_into().expect("step too big for c_ulong"),
+            start.as_time_t(),
             no_overwrite.into(),
             sources.as_ptr(),
             template.map_or_else(null, |s| s.as_ptr()),

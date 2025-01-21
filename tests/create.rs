@@ -9,11 +9,11 @@ fn create_all_ds_types() -> anyhow::Result<()> {
     let now = chrono::Utc::now();
     create::create(
         &rrd_path,
-        time::Duration::from_secs(1),
         now,
+        time::Duration::from_secs(1),
         true,
-        &[],
         None,
+        &[],
         &[
             create::DataSource::gauge(
                 create::DataSourceName::new("gauge"),

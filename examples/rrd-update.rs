@@ -9,11 +9,11 @@ fn main() {
 
     create::create(
         filename,
-        Duration::from_secs(1),
         chrono::Utc::now(),
+        Duration::from_secs(1),
         false,
-        &[],
         None,
+        &[],
         &[
             create::DataSource::gauge(
                 create::DataSourceName::new("volt"),
