@@ -1,21 +1,34 @@
+[![](https://img.shields.io/crates/v/rrd.svg)](https://crates.io/crates/rrd) [![Docs](https://docs.rs/rrd/badge.svg)](https://docs.rs/rrd)
+
 # rrd
 
-Bindings to librrd to create and interact with round robin databases created with Tobias
-Oetiker's rrdtool ([rrdtool.org](https://www.rrdtool.org/)).
+Bindings to `librrd` to create and interact with round robin databases created with Tobias
+Oetiker's  [`rrdtool`](https://www.rrdtool.org/).
 
 > RRDtool is the OpenSource industry standard, high performance data logging and graphing
 > system for time series data. RRDtool can be easily integrated in shell scripts, perl, python,
 > ruby, lua or tcl applications.
 
-And now (well in the near future) also from Rust.
+And now also from Rust.
 
-**This is work in progress and pretty much only usable to
-create new databases right now.**
+## Supported operations
 
-## Building
+This library provides high level APIs for the core RRD operations:
 
-Make sure rrdtool (or at least librrd8) is installed on your system.
-Check [here](https://rrdtool.org/download.en.html) for instructions.
+- Create - make a new round robin database (RRD)
+- Update - add data to an RRD
+- Fetch - get data from an RRD
+- Graph - generate graphs from an RRD
+- Info - get RRD metadata
+
+There are [other operations available in the upstream `rrdtool`](https://oss.oetiker.ch/rrdtool/doc/index.en.html) (e.g.
+exporting to XML, tuning parameters, etc), but as they are generally more administrative in nature, this library doesn't
+expose them (yet?).
+
+## Getting Started
+
+Make sure `rrdtool` (or at least `librrd8`) is installed on your system.
+Any reasonable package manager should have `librrd` packages available, or check [here](https://rrdtool.org/download.en.html) for instructions on building from source.
 
 Then add `rrd` as a dependency to your project.
 
@@ -30,6 +43,7 @@ To link to `librrd-8.dll` you'll need a `.lib` file, which is not
 shipped with the pre-build binaries shipped [here](https://github.com/oetiker/rrdtool-1.x/releases).
 
 Follow these steps to create the `.lib` file:
+
 1. Download [`librrd-8.def`](https://github.com/oetiker/rrdtool-1.x/raw/master/win32/librrd-8.def)
 2. From a VS dev shell: `lib /def:librrd-8.def /out:librrd-8.lib /machine:x64`
 3. Set the `LIBRRD` environment variable to the full path of `librrd-8.lib`

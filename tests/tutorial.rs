@@ -83,9 +83,7 @@ fn tutorial() -> anyhow::Result<()> {
         fetched.sources().iter().map(|ds| ds.name()).collect_vec()
     );
 
-    let fetched_timestamps = fetched.rows().iter().map(|r| r.timestamp()).collect_vec();
-
-    let expected = [
+    let fetched_expected = [
         (920804700, f64::NAN),
         (920805000, 4.0000000000e-02),
         (920805300, 2.0000000000e-02),
@@ -108,10 +106,34 @@ fn tutorial() -> anyhow::Result<()> {
     .map(|(ts, val)| (Timestamp::from_timestamp(ts, 0).unwrap(), val))
     .collect_vec();
 
+    // timestamps match
     assert_eq!(
-        expected.iter().map(|(ts, _val)| *ts).collect_vec(),
-        fetched_timestamps
+        fetched_expected.iter().map(|(ts, _val)| *ts).collect_vec(),
+        fetched.rows().iter().map(|r| r.timestamp()).collect_vec()
     );
+
+    // Compare values without relying on ==, because of NaN and minor differences w/ tutorial
+    // sample output
+    // Row timestamps are the same, so just need to compare values
+    fetched_expected
+        .iter()
+        .map(|(_ts, val)| val)
+        .zip_eq(fetched.rows().iter().map(|row| {
+            let values = row.as_slice();
+            assert_eq!(1, values.len());
+            values[0]
+        }))
+        .enumerate()
+        .for_each(|(index, (expected, actual))| {
+            // Either both nan or neither nan and very close
+            assert!(
+                (expected.is_nan() && actual.is_nan())
+                    || (!expected.is_nan()
+                        && !actual.is_nan()
+                        && (expected - actual).abs() < 0.000000001),
+                "index {index}, expected {expected} actual {actual}"
+            );
+        });
 
     let graph_start = Timestamp::from_timestamp(920804400, 0).unwrap();
     let graph_end = Timestamp::from_timestamp(920808000, 0).unwrap();
