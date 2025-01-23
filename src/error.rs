@@ -1,10 +1,13 @@
+//! RRD-related errors.
+
 use std::ffi::{self, CStr, NulError};
 
 use thiserror::Error;
 
+/// Top-level RRD error used for all `librrd` operations.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum RrdError {
-    /// A string contained \0, and thus could not be converted to a C string
+    /// A string contained `\0`, and thus could not be converted to a C string
     #[error(transparent)]
     NulError(#[from] NulError),
 
@@ -20,11 +23,24 @@ pub enum RrdError {
     #[error("Internal error: {0}")]
     Internal(String),
 
+    /// An [`InvalidArgument`] error
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
 }
 
+/// A `Result<T, RrdError>`, a combo used throughout this library
 pub type RrdResult<T> = Result<T, RrdError>;
+
+/// Indicates that a Rust wrapper type rejected an invalid argument.
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("Invalid argument: {0}")]
+pub struct InvalidArgument(pub(crate) &'static str);
+
+impl From<InvalidArgument> for RrdError {
+    fn from(value: InvalidArgument) -> Self {
+        RrdError::InvalidArgument(value.0.to_string())
+    }
+}
 
 /// Map `0` to `Ok`, anything else to `Err`
 pub(crate) fn return_code_to_result(rc: ffi::c_int) -> RrdResult<()> {
@@ -47,16 +63,5 @@ pub(crate) fn get_rrd_error() -> Option<RrdError> {
             rrd_sys::rrd_clear_error();
             Some(RrdError::LibRrdError(string))
         }
-    }
-}
-
-/// Indicates that a Rust wrapper type detected an invalid argument
-#[derive(Debug, PartialEq, Eq, Error)]
-#[error("Invalid argument: {0}")]
-pub struct InvalidArgument(pub(crate) &'static str);
-
-impl From<InvalidArgument> for RrdError {
-    fn from(value: InvalidArgument) -> Self {
-        RrdError::InvalidArgument(value.0.to_string())
     }
 }

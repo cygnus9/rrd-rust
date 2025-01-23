@@ -1,4 +1,8 @@
-pub mod commands;
+//! Render graphs from RRD data.
+//!
+//! There are many options for graphs. See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html> and
+//! <https://oss.oetiker.ch/rrdtool/tut/rrdtutorial.en.html> for more detail.
+pub mod elements;
 pub mod props;
 
 use crate::error::InvalidArgument;
@@ -6,7 +10,7 @@ use crate::{
     error::{get_rrd_error, RrdError, RrdResult},
     ops::{
         graph::{
-            commands::GraphCommand,
+            elements::GraphElement,
             props::{GraphProps, ImageFormat},
         },
         info::{self, InfoValue},
@@ -21,29 +25,29 @@ use std::{collections, ffi::CString, fmt::Write as _};
 /// Returns a tuple containing the graph image data in the specified format and metadata about the
 /// graph.
 ///
-/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html>.
+/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html> or `/tests/tutorial.rs`.
 pub fn graph(
     image_format: ImageFormat,
     props: GraphProps,
-    commands: &[GraphCommand],
+    elements: &[GraphElement],
 ) -> RrdResult<(Vec<u8>, GraphMetadata)> {
     // detect error conditions that will confusingly produce no librrd output whatsoever
-    if !commands.iter().any(|c| matches!(c, GraphCommand::Def(_))) {
+    if !elements.iter().any(|c| matches!(c, GraphElement::Def(_))) {
         return Err(RrdError::InvalidArgument(
-            "Must have at least one Def command".to_string(),
+            "Must have at least one Def element".to_string(),
         ));
     }
-    if !commands.iter().any(|c| {
+    if !elements.iter().any(|c| {
         matches!(
             c,
-            GraphCommand::Print(_)
-                | GraphCommand::GPrint(_)
-                | GraphCommand::Line(_)
-                | GraphCommand::Area(_)
+            GraphElement::Print(_)
+                | GraphElement::GPrint(_)
+                | GraphElement::Line(_)
+                | GraphElement::Area(_)
         )
     }) {
         return Err(RrdError::InvalidArgument(
-            "Must have at least one Line, Area, GPrint, or Print command".to_string(),
+            "Must have at least one Line, Area, GPrint, or Print element".to_string(),
         ));
     }
 
@@ -52,7 +56,7 @@ pub fn graph(
     let mut args = vec!["graphv".to_string(), "-".to_string()];
     image_format.append_to(&mut args)?;
     props.append_to(&mut args)?;
-    for c in commands {
+    for c in elements {
         c.append_to(&mut args)?;
     }
 
@@ -119,6 +123,8 @@ pub fn graph(
 }
 
 /// Metadata about a rendered graph.
+///
+/// See [`graph`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct GraphMetadata {
     /// Offset in pixels from the left edge of the image
@@ -171,6 +177,7 @@ pub struct GraphMetadata {
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html>
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Color {
     pub red: u8,
     pub green: u8,

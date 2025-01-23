@@ -1,3 +1,5 @@
+//! Fetch data from an RRD.
+
 use crate::{
     data::Data,
     error::{return_code_to_result, RrdResult},
@@ -15,6 +17,9 @@ use std::{
     time::Duration,
 };
 
+/// Fetch data from `filename` between `start` and `end`, consolidated with `cf`.
+///
+/// See <https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html>.
 pub fn fetch(
     filename: &Path,
     cf: ConsolidationFn,
@@ -109,7 +114,10 @@ pub fn fetch(
     ))
 }
 
-/// Contiguous data for the output of `fetch()`.
+/// Contiguous data for the output of [`fetch`].
+///
+/// This is not intended to be used directly, but rather is the underlying storage accessed via
+/// [`Data`].
 pub struct Array {
     ptr: *const rrd_double,
     len: usize,

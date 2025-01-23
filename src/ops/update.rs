@@ -1,3 +1,5 @@
+//! Update (i.e. add data to) an RRD.
+
 use crate::error::RrdError;
 use crate::{
     error::{return_code_to_result, RrdResult},
@@ -11,7 +13,18 @@ use rrd_sys::rrd_int;
 use std::{borrow, ffi::CString, fmt::Write, path::Path, ptr::null};
 
 bitflags! {
+    /// Flags to alter update behavior.
+    ///
+    /// # Examples
+    ///
+    /// No flags:
+    /// ```
+    /// use rrd::ops::update::ExtraFlags;
+    /// let no_flags = ExtraFlags::empty();
+    /// ```
     pub struct ExtraFlags : rrd_int {
+        /// Silently skip updates older than the last update already present rather than returning
+        /// an error.
         const SKIP_PAST_UPDATES = 0x01;
     }
 }
@@ -22,7 +35,25 @@ bitflags! {
 ///
 /// Each batch of data must have the same number of data points.
 ///
+/// This corresponds to `rrdtool update` without the `--template` parameter.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdupdate.en.html>.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+/// use rrd::error::RrdResult;
+/// use rrd::ops::update::{update_all, BatchTime, ExtraFlags};
+///
+/// fn add_some_data(f: &Path) -> RrdResult<()> {
+///     update_all(
+///         f,
+///         ExtraFlags::empty(),
+///         // 1 data point per DS at each timestamp
+///         &[(BatchTime::Now, &[1_u64.into(), 2_f64.into()])])
+/// }
+/// ```
 pub fn update_all<'a, D, B, I>(filename: &Path, extra_flags: ExtraFlags, data: I) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
@@ -56,7 +87,27 @@ where
 ///
 ///  Each batch of data must have the same number of data points.
 ///
+/// This corresponds to `rrdtool update` with the `--template` parameter.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdupdate.en.html>.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+/// use rrd::error::RrdResult;
+/// use rrd::ops::update::{update, BatchTime, ExtraFlags};
+///
+/// fn add_some_data(f: &Path) -> RrdResult<()> {
+///     update(
+///         f,
+///         // Other DSs will have "unknown" data at the provided timestamps
+///         &["ds2"],
+///         ExtraFlags::empty(),
+///         // 1 data point per listed DS above at each timestamp
+///         &[(BatchTime::Now, &[2_f64.into()])])
+/// }
+/// ```
 pub fn update<'a, D, B, I>(
     filename: &Path,
     ds_names: &[&str],
@@ -88,7 +139,9 @@ where
     return_code_to_result(rc)
 }
 
-/// The value for an individual DS at a particular timestamp
+/// The value to set for an individual DS at a particular timestamp.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum Datum {
     Unspecified,
     Int(u64),
@@ -107,17 +160,17 @@ impl From<f64> for Datum {
     }
 }
 
-/// Timestamp to use for a batch of values
+/// Timestamp to use for a batch of [`Datum`] values in an update call.
 pub enum BatchTime {
-    /// Let RRDTool determine the time from the system clock.
+    /// Let `librrd` determine the time from the system clock.
     Now,
     /// Use a specific time
-    Specified(Timestamp),
+    Timestamp(Timestamp),
 }
 
 impl From<Timestamp> for BatchTime {
     fn from(value: Timestamp) -> Self {
-        Self::Specified(value)
+        Self::Timestamp(value)
     }
 }
 
@@ -151,7 +204,7 @@ where
                 BatchTime::Now => {
                     timestamp_arg.push('N');
                 }
-                BatchTime::Specified(ts) => {
+                BatchTime::Timestamp(ts) => {
                     write!(timestamp_arg, "{}", ts.timestamp())
                         .expect("Writing to a String can't fail");
                 }

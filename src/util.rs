@@ -1,9 +1,11 @@
-use crate::error::RrdError;
+//! Miscellaneous utilities.
+
+use crate::error::{RrdError, RrdResult};
 use itertools::Itertools;
 use rrd_sys::rrd_char;
-use std::{ffi::CString, fmt, path::Path, ptr, result::Result};
+use std::{ffi::CString, fmt, path::Path, ptr};
 
-/// Conveniently convert a `Path` to a `&str`
+/// Conveniently convert a `Path` to a `&str`, mapping non-UTF-8 paths to `RrdError`.
 ///
 /// # Examples
 /// ```
@@ -40,7 +42,7 @@ use std::{ffi::CString, fmt, path::Path, ptr, result::Result};
 ///     assert!(path_to_str(path).is_err());
 /// }
 /// ```
-pub fn path_to_str(path: &Path) -> Result<&str, RrdError> {
+pub fn path_to_str(path: &Path) -> RrdResult<&str> {
     path.to_str().ok_or(RrdError::PathEncodingError)
 }
 
@@ -52,7 +54,7 @@ pub(crate) struct MaybeNullTerminatedArrayOfStrings<const IS_NULL_TERMINATED: bo
 
 impl<const IS_NULL_TERMINATED: bool> MaybeNullTerminatedArrayOfStrings<IS_NULL_TERMINATED> {
     #[cfg(test)]
-    fn new<T, U>(strings: T) -> crate::error::RrdResult<Self>
+    fn new<T, U>(strings: T) -> RrdResult<Self>
     where
         T: IntoIterator<Item = U>,
         U: Into<String>,

@@ -1,3 +1,5 @@
+//! Create new RRDs.
+
 use crate::error::InvalidArgument;
 use crate::{
     error::{return_code_to_result, RrdResult},
@@ -7,6 +9,8 @@ use crate::{
 use log::debug;
 use std::{ffi::CString, path::Path, ptr::null, time::Duration};
 
+/// Create a new RRD.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdcreate.en.html>.
 #[allow(clippy::too_many_arguments)]
 pub fn create<'a>(
@@ -61,12 +65,15 @@ pub fn create<'a>(
     return_code_to_result(rc)
 }
 
+/// Definition of a data source in an RRD.
+///
 /// Corresponds to the `DS` arg to `rrdcreate`.
 pub struct DataSource {
     arg: String,
 }
 
 impl DataSource {
+    /// Define a 'GAUGE' data source.
     pub fn gauge(name: DataSourceName, heartbeat: u32, min: Option<f64>, max: Option<f64>) -> Self {
         Self {
             arg: format!(
@@ -80,6 +87,7 @@ impl DataSource {
         }
     }
 
+    /// Define a 'COUNTER` data source.
     pub fn counter(
         name: DataSourceName,
         heartbeat: u32,
@@ -98,6 +106,7 @@ impl DataSource {
         }
     }
 
+    /// Define a 'DCOUNTER` data source.
     pub fn dcounter(
         name: DataSourceName,
         heartbeat: u32,
@@ -116,6 +125,7 @@ impl DataSource {
         }
     }
 
+    /// Define a 'DERIVE` data source.
     pub fn derive(
         name: DataSourceName,
         heartbeat: u32,
@@ -134,6 +144,7 @@ impl DataSource {
         }
     }
 
+    /// Define a 'DDERIVE` data source.
     pub fn dderive(
         name: DataSourceName,
         heartbeat: u32,
@@ -152,6 +163,7 @@ impl DataSource {
         }
     }
 
+    /// Define an 'ABSOLUTE` data source.
     pub fn absolute(
         name: DataSourceName,
         heartbeat: u32,
@@ -170,6 +182,7 @@ impl DataSource {
         }
     }
 
+    /// Define a 'COMPUTE` data source.
     pub fn compute(name: DataSourceName, rpn: &str) -> Self {
         Self {
             arg: format!("DS:{}:COMPUTE:{rpn}", name.name),
@@ -182,6 +195,7 @@ impl DataSource {
     }
 }
 
+/// A plain data source name, or a mapping referencing a `source` DS.
 pub struct DataSourceName {
     /// The `name` string to use in a DS arg for `create`.
     name: String,
@@ -216,7 +230,7 @@ pub struct Archive {
 impl Archive {
     /// `xfiles_factor` must be between 0 and 1.
     ///
-    /// Returns `Some` if `xfiles_factor` is valid, `None` otherwise.`
+    /// Returns `Some` if `xfiles_factor` is valid, `None` otherwise.
     pub fn new(
         consolidation_fn: ConsolidationFn,
         xfiles_factor: f64,

@@ -1,7 +1,7 @@
 use std::{f64::consts::PI, path::Path, time::Duration};
 
 use rrd::{
-    ops::{create, update, update::update_all},
+    ops::{create, fetch::fetch, update, update::update_all},
     ConsolidationFn,
 };
 
@@ -51,7 +51,7 @@ fn main() {
         .unwrap();
     }
 
-    let rc = rrd::fetch(
+    let rc = fetch(
         filename,
         ConsolidationFn::Avg,
         start,
@@ -66,10 +66,10 @@ fn main() {
             println!("  Step: {:?}", data.step());
             println!("  Rows: {}", data.row_count());
 
-            let sources = data.sources();
-            println!("  Data sources: {}", sources.len());
-            for (i, source) in sources.iter().enumerate() {
-                println!("    #{}: {}", i, source.name());
+            let ds_names = data.ds_names();
+            println!("  Data sources: {}", ds_names.len());
+            for (i, ds_name) in ds_names.iter().enumerate() {
+                println!("    #{}: {}", i, ds_name);
             }
             let rows = data.rows();
             println!("  Rows: {}", rows.len());
