@@ -1,3 +1,7 @@
+//! This exposes `bindgen` bindings to [`librrd`](https://oss.oetiker.ch/rrdtool/index.en.html).
+//!
+//! For a high level library built on top of this, see [`rrd`](https://crates.io/crates/rrd).
+
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]

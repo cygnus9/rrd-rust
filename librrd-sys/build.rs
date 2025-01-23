@@ -1,12 +1,13 @@
 use std::{env, path::{Path, PathBuf}};
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(rrdsys_use_pregen)");
+
     if env::var("DOCS_RS").is_ok() {
-        // Nothing to do
+        println!("cargo::rustc-cfg=rrdsys_use_pregen");
         return;
     }
 
-    println!("cargo::rustc-check-cfg=cfg(rrdsys_use_pregen)");
     if let Some(location) = configure_rrd() {
         create_bindings(location);
     } else {
