@@ -1,3 +1,26 @@
+//! The data and visual elements to include in the graph.
+//!
+//! Extracting and processing data:
+//!
+//! - [`Def`]
+//! - [`VDef`]
+//! - [`CDef`]
+//! - See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
+//!
+//! Visual elements and controls:
+//!
+//! - [`Print`]
+//! - [`GPrint`]
+//! - [`Comment`]
+//! - [`VRule`]
+//! - [`HRule`]
+//! - [`Line`]
+//! - [`Area`]
+//! - [`Tick`]
+//! - [`Shift`]
+//! - [`TextAlign`]
+//! - See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
+
 use crate::{
     error::{InvalidArgument, RrdResult},
     ops::graph::{AppendArgs, Color},
@@ -7,9 +30,13 @@ use crate::{
 use itertools::Itertools;
 use std::{fmt::Write as _, path::PathBuf, sync};
 
-/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
+/// Enum expressing all possible elements.
+///
+/// This is typically not used directly, as it only exists as a convenience type to be able to
+/// `.into()` other elements ([`Def`], etc) into a common type in a `graph()` call.
 #[derive(Debug, Clone, PartialEq)]
-pub enum GraphCommand {
+#[allow(missing_docs)]
+pub enum GraphElement {
     Def(Def),
     CDef(CDef),
     VDef(VDef),
@@ -25,28 +52,31 @@ pub enum GraphCommand {
     TextAlign(TextAlign),
 }
 
-impl AppendArgs for GraphCommand {
+impl AppendArgs for GraphElement {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         match self {
-            GraphCommand::Def(c) => c.append_to(args),
-            GraphCommand::CDef(c) => c.append_to(args),
-            GraphCommand::VDef(c) => c.append_to(args),
-            GraphCommand::Print(c) => c.append_to(args),
-            GraphCommand::GPrint(c) => c.append_to(args),
-            GraphCommand::Comment(c) => c.append_to(args),
-            GraphCommand::VRule(c) => c.append_to(args),
-            GraphCommand::HRule(c) => c.append_to(args),
-            GraphCommand::Line(c) => c.append_to(args),
-            GraphCommand::Area(c) => c.append_to(args),
-            GraphCommand::Tick(c) => c.append_to(args),
-            GraphCommand::Shift(c) => c.append_to(args),
-            GraphCommand::TextAlign(c) => c.append_to(args),
+            GraphElement::Def(c) => c.append_to(args),
+            GraphElement::CDef(c) => c.append_to(args),
+            GraphElement::VDef(c) => c.append_to(args),
+            GraphElement::Print(c) => c.append_to(args),
+            GraphElement::GPrint(c) => c.append_to(args),
+            GraphElement::Comment(c) => c.append_to(args),
+            GraphElement::VRule(c) => c.append_to(args),
+            GraphElement::HRule(c) => c.append_to(args),
+            GraphElement::Line(c) => c.append_to(args),
+            GraphElement::Area(c) => c.append_to(args),
+            GraphElement::Tick(c) => c.append_to(args),
+            GraphElement::Shift(c) => c.append_to(args),
+            GraphElement::TextAlign(c) => c.append_to(args),
         }
     }
 }
 
+/// Define data to fetch from a DS.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Def {
     pub var_name: VarName,
     pub rrd: PathBuf,
@@ -87,7 +117,7 @@ impl AppendArgs for Def {
     }
 }
 
-impl From<Def> for GraphCommand {
+impl From<Def> for GraphElement {
     fn from(value: Def) -> Self {
         Self::Def(value)
     }
@@ -97,6 +127,7 @@ impl From<Def> for GraphCommand {
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct VDef {
     pub var_name: VarName,
     pub rpn: String,
@@ -108,7 +139,7 @@ impl AppendArgs for VDef {
     }
 }
 
-impl From<VDef> for GraphCommand {
+impl From<VDef> for GraphElement {
     fn from(value: VDef) -> Self {
         Self::VDef(value)
     }
@@ -117,7 +148,9 @@ impl From<VDef> for GraphCommand {
 /// RPN to produce a new set of data points.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct CDef {
     pub var_name: VarName,
     pub rpn: String,
@@ -130,7 +163,7 @@ impl AppendArgs for CDef {
     }
 }
 
-impl From<CDef> for GraphCommand {
+impl From<CDef> for GraphElement {
     fn from(value: CDef) -> Self {
         Self::CDef(value)
     }
@@ -150,6 +183,7 @@ static VALID_VNAME: sync::LazyLock<regex::Regex> =
     sync::LazyLock::new(|| regex::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
 
 impl VarName {
+    /// Create a new VarName, if the provided string is a valid name.
     pub fn new(name: impl Into<String>) -> Result<Self, InvalidArgument> {
         let s = name.into();
         if s.len() <= 255 && VALID_VNAME.is_match(&s) {
@@ -175,8 +209,11 @@ impl TryFrom<&str> for VarName {
     }
 }
 
+/// Specify text to print on the graph.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Print {
     /// Must be a var name defined by a [`VDef`].
     pub var_name: VarName,
@@ -207,7 +244,7 @@ impl AppendArgs for Print {
     }
 }
 
-impl From<Print> for GraphCommand {
+impl From<Print> for GraphElement {
     fn from(value: Print) -> Self {
         Self::Print(value)
     }
@@ -215,8 +252,9 @@ impl From<Print> for GraphCommand {
 
 /// See [`Print`].
 ///
-/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_data.en.html>
+/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum PrintFormatMode {
     StrfTime,
     ValStrfTime,
@@ -227,6 +265,7 @@ pub enum PrintFormatMode {
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct GPrint {
     pub var_name: VarName,
     pub format: String,
@@ -239,14 +278,17 @@ impl AppendArgs for GPrint {
     }
 }
 
-impl From<GPrint> for GraphCommand {
+impl From<GPrint> for GraphElement {
     fn from(value: GPrint) -> Self {
         Self::GPrint(value)
     }
 }
 
+/// Text to include in the legend.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Comment {
     pub text: String,
 }
@@ -258,14 +300,17 @@ impl AppendArgs for Comment {
     }
 }
 
-impl From<Comment> for GraphCommand {
+impl From<Comment> for GraphElement {
     fn from(value: Comment) -> Self {
         Self::Comment(value)
     }
 }
 
+/// A vertical line at a specific time.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct VRule {
     pub value: Value,
     pub color: Color,
@@ -289,14 +334,17 @@ impl AppendArgs for VRule {
     }
 }
 
-impl From<VRule> for GraphCommand {
+impl From<VRule> for GraphElement {
     fn from(value: VRule) -> Self {
         Self::VRule(value)
     }
 }
 
+/// A var reference, timestamp, or fixed value.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum Value {
     Variable(VarName),
     Timestamp(Timestamp),
@@ -334,8 +382,11 @@ impl From<f64> for Value {
     }
 }
 
+/// Dash configuration for a [`VRule`], [`HRule`], or [`Line`].
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct Dashes {
     pub spacing: Option<DashSpacing>,
     pub offset: Option<u32>,
@@ -366,7 +417,9 @@ impl Dashes {
     }
 }
 
-/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
+/// Dash spacing.
+///
+/// See [`Dashes`] and <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DashSpacing {
     /// Must be positive
@@ -377,8 +430,11 @@ pub enum DashSpacing {
     Custom(Vec<(u32, u32)>),
 }
 
+/// A horizontal line at a particular value.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct HRule {
     pub value: Value,
     pub color: Color,
@@ -402,17 +458,20 @@ impl AppendArgs for HRule {
     }
 }
 
-impl From<HRule> for GraphCommand {
+impl From<HRule> for GraphElement {
     fn from(value: HRule) -> Self {
         Self::HRule(value)
     }
 }
 
+/// Plot the value of a var over time.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Line {
     pub width: f64,
-    pub value: Value,
+    pub value: VarName,
     pub color: Option<ColorWithLegend<Color>>,
     pub stack: bool,
     pub skip_scale: bool,
@@ -421,8 +480,7 @@ pub struct Line {
 
 impl AppendArgs for Line {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
-        let mut s = format!("LINE{}:", self.width);
-        self.value.append_to(&mut s);
+        let mut s = format!("LINE{}:{}", self.width, self.value.name);
 
         if let Some(cwl) = &self.color {
             cwl.color.append_to(&mut s);
@@ -449,7 +507,7 @@ impl AppendArgs for Line {
     }
 }
 
-impl From<Line> for GraphCommand {
+impl From<Line> for GraphElement {
     fn from(value: Line) -> Self {
         Self::Line(value)
     }
@@ -459,15 +517,19 @@ impl From<Line> for GraphCommand {
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct ColorWithLegend<C> {
     pub color: C,
     pub legend: Option<Legend>,
 }
 
+/// Like [`Line`], but with the area between the x axis and the line filled in.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Area {
-    pub value: Value,
+    pub value: VarName,
     pub color: Option<ColorWithLegend<AreaColor>>,
     pub stack: bool,
     pub skip_scale: bool,
@@ -475,8 +537,7 @@ pub struct Area {
 
 impl AppendArgs for Area {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
-        let mut s = "AREA:".to_string();
-        self.value.append_to(&mut s);
+        let mut s = format!("AREA:{}", self.value.name);
 
         let grad_height = if let Some(cwl) = &self.color {
             let gh = match cwl.color {
@@ -528,16 +589,17 @@ impl AppendArgs for Area {
     }
 }
 
-impl From<Area> for GraphCommand {
+impl From<Area> for GraphElement {
     fn from(value: Area) -> Self {
         Self::Area(value)
     }
 }
 
-/// See [`Area`].
+/// Color or gradient for an [`Area`].
 ///
-/// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
+/// See [`Area`] and <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum AreaColor {
     Color(Color),
     Gradient {
@@ -547,8 +609,11 @@ pub enum AreaColor {
     },
 }
 
+/// Draw tick marks for nonzero values.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Tick {
     pub var_name: VarName,
     pub color: Color,
@@ -571,14 +636,17 @@ impl AppendArgs for Tick {
     }
 }
 
-impl From<Tick> for GraphCommand {
+impl From<Tick> for GraphElement {
     fn from(value: Tick) -> Self {
         Self::Tick(value)
     }
 }
 
+/// Shift the offset for subsequent elements.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Shift {
     pub var_name: VarName,
     pub offset: Offset,
@@ -593,16 +661,17 @@ impl AppendArgs for Shift {
     }
 }
 
-impl From<Shift> for GraphCommand {
+impl From<Shift> for GraphElement {
     fn from(value: Shift) -> Self {
         Self::Shift(value)
     }
 }
 
-/// See [`Shift`].
+/// An offset used in [`Shift`].
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum Offset {
     Variable(VarName),
     TimeDelta(f64),
@@ -618,8 +687,11 @@ impl Offset {
     }
 }
 
+/// Controls text alignment for labels.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum TextAlign {
     Left,
     Right,
@@ -642,24 +714,23 @@ impl AppendArgs for TextAlign {
     }
 }
 
-impl From<TextAlign> for GraphCommand {
+impl From<TextAlign> for GraphElement {
     fn from(value: TextAlign) -> Self {
         Self::TextAlign(value)
     }
 }
 
 // TODO escape colons for the user
+/// Text to include in the legend for the containing element.
+///
 /// Colons (`:`) must be escaped as `\:`, which in a string literal needs the backslash escaped
-/// as well, so it would be typed `"\\:"`. See [`Legend::ESCAPED_COLON`] for a const with the
-/// appropriate str.
+/// as well, so it would be typed `"\\:"`.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Legend(String);
 
 impl Legend {
-    pub const ESCAPED_COLON: &'static str = "\\:";
-
     /// Appends `:` followed by quote-wrapped legend text.
     fn append_to(&self, s: &mut String) {
         // It's unclear from the docs -- does this need to be quoted, or is that only to deal with
@@ -837,7 +908,7 @@ mod tests {
         let mut args = vec![];
         Line {
             width: 3.2,
-            value: Value::Variable(VarName::new("var").unwrap()),
+            value: VarName::new("var").unwrap(),
             color: Some(ColorWithLegend {
                 color: "#01020304".parse().unwrap(),
                 legend: Some("foo".to_string().into()),
@@ -859,7 +930,7 @@ mod tests {
     fn area() {
         let mut args = vec![];
         Area {
-            value: Value::Variable(VarName::new("var").unwrap()),
+            value: VarName::new("var").unwrap(),
             color: Some(ColorWithLegend {
                 color: AreaColor::Gradient {
                     color1: "#01020304".parse().unwrap(),

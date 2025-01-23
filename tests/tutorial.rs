@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rrd::{
     ops::{
         create, fetch, graph,
-        graph::{commands, props},
+        graph::{elements, props},
         update,
     },
     ConsolidationFn, Timestamp,
@@ -80,7 +80,7 @@ fn tutorial() -> anyhow::Result<()> {
 
     assert_eq!(
         vec!["speed".to_string()],
-        fetched.sources().iter().map(|ds| ds.name()).collect_vec()
+        fetched.ds_names().iter().cloned().collect_vec()
     );
 
     let fetched_timestamps = fetched.rows().iter().map(|r| r.timestamp()).collect_vec();
@@ -132,7 +132,7 @@ fn tutorial() -> anyhow::Result<()> {
 
     // first basic graph
     {
-        let var_name: commands::VarName = "myspeed".try_into()?;
+        let var_name: elements::VarName = "myspeed".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
             props::GraphProps {
@@ -144,7 +144,7 @@ fn tutorial() -> anyhow::Result<()> {
                 ..Default::default()
             },
             &[
-                commands::Def {
+                elements::Def {
                     var_name: var_name.clone(),
                     rrd: rrd_path.clone(),
                     ds_name: "speed".to_string(),
@@ -155,10 +155,10 @@ fn tutorial() -> anyhow::Result<()> {
                     reduce: None,
                 }
                 .into(),
-                commands::Line {
+                elements::Line {
                     width: 2.0,
-                    value: var_name.into(),
-                    color: Some(commands::ColorWithLegend {
+                    value: var_name,
+                    color: Some(elements::ColorWithLegend {
                         color: graph::Color {
                             red: 0xFF,
                             green: 0x00,
@@ -182,7 +182,7 @@ fn tutorial() -> anyhow::Result<()> {
 
     // graph with a simple calculation
     {
-        let myspeed: commands::VarName = "myspeed".try_into()?;
+        let myspeed: elements::VarName = "myspeed".try_into()?;
         let realspeed = "realspeed".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
@@ -195,7 +195,7 @@ fn tutorial() -> anyhow::Result<()> {
                 ..Default::default()
             },
             &[
-                commands::Def {
+                elements::Def {
                     var_name: myspeed.clone(),
                     rrd: rrd_path.clone(),
                     ds_name: "speed".to_string(),
@@ -206,15 +206,15 @@ fn tutorial() -> anyhow::Result<()> {
                     reduce: None,
                 }
                 .into(),
-                commands::CDef {
+                elements::CDef {
                     var_name: realspeed,
                     rpn: "myspeed,1000,*".to_string(),
                 }
                 .into(),
-                commands::Line {
+                elements::Line {
                     width: 2.0,
-                    value: myspeed.into(),
-                    color: Some(commands::ColorWithLegend {
+                    value: myspeed,
+                    color: Some(elements::ColorWithLegend {
                         color: graph::Color {
                             red: 0xFF,
                             green: 0x00,
@@ -237,9 +237,9 @@ fn tutorial() -> anyhow::Result<()> {
 
     // graph with more calculations
     {
-        let myspeed: commands::VarName = "myspeed".try_into()?;
-        let good: commands::VarName = "good".try_into()?;
-        let fast: commands::VarName = "fast".try_into()?;
+        let myspeed: elements::VarName = "myspeed".try_into()?;
+        let good: elements::VarName = "good".try_into()?;
+        let fast: elements::VarName = "fast".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
             props::GraphProps {
@@ -255,7 +255,7 @@ fn tutorial() -> anyhow::Result<()> {
                 ..Default::default()
             },
             &[
-                commands::Def {
+                elements::Def {
                     var_name: myspeed.clone(),
                     rrd: rrd_path.clone(),
                     ds_name: "speed".to_string(),
@@ -266,22 +266,22 @@ fn tutorial() -> anyhow::Result<()> {
                     reduce: None,
                 }
                 .into(),
-                commands::CDef {
+                elements::CDef {
                     var_name: "kmh".try_into()?,
                     rpn: "myspeed,3600,*".to_string(),
                 }
                 .into(),
-                commands::CDef {
+                elements::CDef {
                     var_name: fast.clone(),
                     rpn: "kmh,100,GT,kmh,0,IF".to_string(),
                 }
                 .into(),
-                commands::CDef {
+                elements::CDef {
                     var_name: good.clone(),
                     rpn: "kmh,100,GT,0,kmh,IF".to_string(),
                 }
                 .into(),
-                commands::HRule {
+                elements::HRule {
                     value: 100.0_f64.into(),
                     color: graph::Color {
                         red: 0,
@@ -293,10 +293,10 @@ fn tutorial() -> anyhow::Result<()> {
                     dashes: None,
                 }
                 .into(),
-                commands::Area {
-                    value: good.into(),
-                    color: Some(commands::ColorWithLegend {
-                        color: commands::AreaColor::Color(graph::Color {
+                elements::Area {
+                    value: good,
+                    color: Some(elements::ColorWithLegend {
+                        color: elements::AreaColor::Color(graph::Color {
                             red: 0,
                             green: 0xFF,
                             blue: 0,
@@ -308,10 +308,10 @@ fn tutorial() -> anyhow::Result<()> {
                     skip_scale: false,
                 }
                 .into(),
-                commands::Area {
-                    value: fast.into(),
-                    color: Some(commands::ColorWithLegend {
-                        color: commands::AreaColor::Color(graph::Color {
+                elements::Area {
+                    value: fast,
+                    color: Some(elements::ColorWithLegend {
+                        color: elements::AreaColor::Color(graph::Color {
                             red: 0xFF,
                             green: 0,
                             blue: 0,

@@ -2,7 +2,7 @@ use rrd::{
     error::RrdResult,
     ops::{
         create, graph,
-        graph::{commands, props},
+        graph::{elements, props},
         update,
     },
     ConsolidationFn, Timestamp,
@@ -109,7 +109,7 @@ fn build_graph(
     img_format: props::ImageFormat,
     ds_name: &str,
 ) -> RrdResult<Vec<u8>> {
-    let var_name_g = commands::VarName::new("g".to_string())?;
+    let var_name_g = elements::VarName::new("g".to_string())?;
     // a little before and a little after the data points in update()
     let start = Timestamp::from_timestamp(1737316000, 0).unwrap();
     let end = Timestamp::from_timestamp(1737319000, 0).unwrap();
@@ -125,7 +125,7 @@ fn build_graph(
             ..Default::default()
         },
         &[
-            commands::Def {
+            elements::Def {
                 var_name: var_name_g.clone(),
                 rrd: rrd_path,
                 ds_name: ds_name.to_string(),
@@ -136,9 +136,9 @@ fn build_graph(
                 reduce: None,
             }
             .into(),
-            commands::Line {
+            elements::Line {
                 width: 4.0,
-                value: var_name_g.clone().into(),
+                value: var_name_g.clone(),
                 color: None,
                 stack: false,
                 skip_scale: false,

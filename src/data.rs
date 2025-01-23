@@ -1,11 +1,12 @@
+//! Support for navigating fetched data sets.
+
 use crate::Timestamp;
 use rrd_sys::rrd_double;
 use std::{fmt, ops::Deref, time::Duration};
 
-/// Adds a safe abstraction on top of the result of `rrd::fetch`.
+/// Provides a safe abstraction for traversing the dataset produced by `fetch()`.
 ///
-/// Object of this type provide access to both the data and the
-/// metadata (e.g. start, end, step and data sources).
+/// Contains both the data and the metadata (e.g. start, end, step and data sources).
 pub struct Data<T> {
     start: Timestamp,
     end: Timestamp,
@@ -19,7 +20,7 @@ impl<T> Data<T>
 where
     T: Deref<Target = [rrd_double]>,
 {
-    pub fn new(
+    pub(crate) fn new(
         start: Timestamp,
         end: Timestamp,
         step: Duration,
@@ -38,148 +39,36 @@ where
         }
     }
 
+    /// Timestamp for the first row of data.
     pub fn start(&self) -> Timestamp {
         self.start
     }
 
+    /// Timestamp for the last row of data.
     pub fn end(&self) -> Timestamp {
         self.end
     }
 
+    /// Time step between rows.
     pub fn step(&self) -> Duration {
         self.step
     }
 
-    /// Return the number of rows in the dataset.
-    ///
-    /// # Examples
-    /// ```
-    /// use std::time::{Duration};
-    /// use rrd::data::Data;
-    /// use rrd::Timestamp;
-    ///
-    /// let data = Data::new(
-    ///     Timestamp::UNIX_EPOCH,
-    ///     Timestamp::UNIX_EPOCH,
-    ///     Duration::from_secs(1),
-    ///     vec![String::from("ds1"), String::from("ds2")],
-    ///     vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-    /// );
-    ///
-    /// assert_eq!(data.row_count(), 3)
-    /// ```
+    /// The number of rows in the dataset.
     pub fn row_count(&self) -> usize {
         self.row_count
     }
 
-    pub fn sources(&self) -> DataSources<T> {
-        DataSources { data: self }
+    /// The data source names in the dataset.
+    ///
+    /// Data sources are conceptually the "columns".
+    pub fn ds_names(&self) -> &[String] {
+        &self.names
     }
 
+    /// The rows of data in the dataset.
     pub fn rows(&self) -> Rows<T> {
         Rows { data: self }
-    }
-}
-
-pub struct DataSources<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    data: &'data Data<T>,
-}
-
-impl<'data, T> DataSources<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    pub fn len(&self) -> usize {
-        self.data.names.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.data.names.is_empty()
-    }
-
-    pub fn iter(&self) -> DataSourcesIter<'data, T> {
-        DataSourcesIter::new(self.data)
-    }
-}
-
-impl<'data, T> IntoIterator for DataSources<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    type Item = DataSource<'data, T>;
-
-    type IntoIter = DataSourcesIter<'data, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        DataSourcesIter::new(self.data)
-    }
-}
-
-pub struct DataSourcesIter<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    data: &'data Data<T>,
-    next_index: usize,
-}
-
-impl<'data, T> DataSourcesIter<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    fn new(data: &'data Data<T>) -> Self {
-        Self {
-            data,
-            next_index: 0,
-        }
-    }
-}
-
-impl<'data, T> Iterator for DataSourcesIter<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    type Item = DataSource<'data, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next_index < self.data.names.len() {
-            let index = self.next_index;
-            self.next_index += 1;
-            Some(DataSource {
-                data: self.data,
-                index,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let ds_count = self.data.names.len();
-        let remaining = ds_count - self.next_index.min(ds_count);
-        (remaining, Some(remaining))
-    }
-}
-
-impl<T> ExactSizeIterator for DataSourcesIter<'_, T> where T: Deref<Target = [rrd_double]> {}
-
-/// A data source in [`Data`].
-///
-/// Conceptually, this is a column defining the order of values in a [`Row`].
-pub struct DataSource<'data, T> {
-    data: &'data Data<T>,
-    index: usize,
-}
-
-impl<'data, T> DataSource<'data, T>
-where
-    T: Deref<Target = [rrd_double]>,
-{
-    pub fn name(&self) -> &'data str {
-        &self.data.names[self.index]
     }
 }
 
@@ -192,14 +81,17 @@ impl<'data, T> Rows<'data, T>
 where
     T: Deref<Target = [rrd_double]>,
 {
+    /// The number of rows.
     pub fn len(&self) -> usize {
         self.data.row_count()
     }
 
+    /// True _iff_ there are 0 rows.
     pub fn is_empty(&self) -> bool {
         self.data.row_count() == 0
     }
 
+    /// Iterate over the rows.
     pub fn iter(&self) -> RowsIter<'data, T> {
         RowsIter::new(self.data)
     }
@@ -227,7 +119,9 @@ where
     }
 }
 
-/// Iteratover over [`Row`]s in [`Data`]
+/// Iterate over [`Row`]s in [`Data`].
+///
+/// See [`Rows::iter`].
 pub struct RowsIter<'data, T> {
     data: &'data Data<T>,
     max_index: usize,
@@ -290,6 +184,7 @@ where
         }
     }
 
+    /// The timestamp for this row of data.
     pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
@@ -352,9 +247,11 @@ where
     }
 }
 
-/// Includes the corresponding DS name for each value in a row.
+/// Contains a value in a [`Row`] along with the corresponding DS name.
 #[derive(Debug)]
 pub struct Cell<'data> {
+    /// The data source name for this value
     pub name: &'data str,
+    /// A value in a [`Row`]
     pub value: f64,
 }

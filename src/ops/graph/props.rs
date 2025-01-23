@@ -1,8 +1,12 @@
+//! Basic characteristics of a graph.
+
 use crate::error::{InvalidArgument, RrdResult};
 use crate::ops::graph::Color;
 use crate::{ops::graph::AppendArgs, Timestamp};
 use std::collections;
 
+/// Top level graph properties.
+///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html>.
 ///
 /// # Examples
@@ -21,6 +25,7 @@ use std::collections;
 /// };
 /// ```
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct GraphProps {
     pub time_range: TimeRange,
     pub labels: Labels,
@@ -51,8 +56,11 @@ impl AppendArgs for GraphProps {
     }
 }
 
+/// Time range to graph over.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct TimeRange {
     pub start: Option<Timestamp>,
     pub end: Option<Timestamp>,
@@ -77,8 +85,11 @@ impl AppendArgs for TimeRange {
     }
 }
 
+/// Title & vertical label.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Labels {
     pub title: Option<String>,
     pub vertical_label: Option<String>,
@@ -99,8 +110,11 @@ impl AppendArgs for Labels {
     }
 }
 
+/// Canvas/graph size.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Size {
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -131,8 +145,11 @@ impl AppendArgs for Size {
     }
 }
 
+/// Data limits and scale.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Limits {
     pub upper_limit: Option<f64>,
     pub lower_limit: Option<f64>,
@@ -184,15 +201,21 @@ impl AppendArgs for Limits {
     }
 }
 
+/// Limits for alternate autoscale algorithm.
+///
 /// See [`Limits`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct AltAutoscale {
     pub alt_autoscale_min: Option<f64>,
     pub alt_autoscale_max: Option<f64>,
 }
 
+/// X axis format.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct XAxis {
     pub grid: Option<XAxisGrid>,
     pub week_format: Option<String>,
@@ -231,8 +254,11 @@ impl AppendArgs for XAxis {
     }
 }
 
+/// X axis grid format and label.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum XAxisGrid {
     None,
     Custom {
@@ -247,8 +273,11 @@ pub enum XAxisGrid {
     },
 }
 
+/// Time unit used in grid labels.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum AxisGridTimeUnit {
     Second,
     Minute,
@@ -273,8 +302,11 @@ impl AxisGridTimeUnit {
     }
 }
 
+/// Y axis format.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct YAxis {
     pub grid: Option<YAxisGrid>,
     pub formatter: Option<YAxisFormatter>,
@@ -343,15 +375,21 @@ impl AppendArgs for YAxis {
     }
 }
 
+/// Y axis grid format.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum YAxisGrid {
     None,
     Custom { grid_step: u32, label_factor: u32 },
 }
 
+/// Axis value formatter.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum YAxisFormatter {
     Numeric,
     Timestamp,
@@ -373,6 +411,8 @@ impl AppendArgs for YAxisFormatter {
     }
 }
 
+/// Y axis value exponent.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UnitsExponent {
@@ -380,8 +420,11 @@ pub struct UnitsExponent {
     pub exp: i8,
 }
 
+/// Y axis unit.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum Units {
     Si,
 }
@@ -397,8 +440,11 @@ impl UnitsExponent {
     }
 }
 
+/// Right y axis format.
+///
 /// See [`GraphProps`]
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct RightYAxis {
     pub scale: f64,
     pub shift: u32,
@@ -431,8 +477,11 @@ impl AppendArgs for RightYAxis {
     }
 }
 
+/// Legend position and format.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Legend {
     pub no_legend: bool,
     pub force_rules_legend: bool,
@@ -475,8 +524,11 @@ impl AppendArgs for Legend {
     }
 }
 
+/// Legend position.
+///
 /// See [`Legend`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum LegendPosition {
     North,
     South,
@@ -484,16 +536,22 @@ pub enum LegendPosition {
     West,
 }
 
+/// Legend direction.
+///
 /// See [`Legend`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum LegendDirection {
     TopDown,
     BottomUp,
     BottomUp2,
 }
 
+/// Miscellaneous other properties.
+///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub struct Misc {
     // Skipping `lazy` as it is inapplicable when generating an in-memory graph
     // Skipping daemon as we don't support daemons
@@ -624,8 +682,11 @@ impl AppendArgs for Misc {
     }
 }
 
+/// Aspects that can have a color set.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum ColorTag {
     Back,
     Canvas,
@@ -639,6 +700,8 @@ pub enum ColorTag {
     Arrow,
 }
 
+/// Zoom level.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Zoom {
@@ -656,15 +719,21 @@ impl Zoom {
     }
 }
 
+/// Font size and name.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct FontParams {
     pub size: u32,
     pub font: Option<String>,
 }
 
+/// Text type that can have a font set.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum FontTag {
     Default,
     Title,
@@ -674,8 +743,11 @@ pub enum FontTag {
     Watermark,
 }
 
+/// Font render mode.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum FontRenderMode {
     Normal,
     Light,
@@ -698,8 +770,11 @@ impl AppendArgs for FontRenderMode {
     }
 }
 
+/// Graph anti-aliasing render mode.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum GraphRenderMode {
     Normal,
     Mono,
@@ -720,8 +795,11 @@ impl AppendArgs for GraphRenderMode {
     }
 }
 
+/// Image format to render the graph as.
+///
 /// See [`Misc`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum ImageFormat {
     Png,
     Svg,

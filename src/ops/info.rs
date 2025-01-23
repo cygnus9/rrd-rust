@@ -1,3 +1,5 @@
+//! Get info about an RRD.
+
 use crate::{
     error::{get_rrd_error, RrdError, RrdResult},
     util::path_to_str,
@@ -8,6 +10,12 @@ use std::{
     path::Path,
 };
 
+/// Returns a map of metadata about the RRD at `filename`.
+///
+/// The contents vary based on RRD structure, but generally provide info about each data source and
+/// RRA.
+///
+/// See <https://oss.oetiker.ch/rrdtool/doc/rrdinfo.en.html>.
 pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
     let filename = CString::new(path_to_str(filename)?)?;
 
@@ -21,7 +29,7 @@ pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
     Ok(build_info_map(result_ptr))
 }
 
-/// Value in the map returned from [`info()`]
+/// Value in the map returned from [`info()`], and other places that use the same info map.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 #[allow(missing_docs)]
 pub enum InfoValue {
