@@ -71,6 +71,7 @@ fn create_bindings(location: HeaderLocation) {
         .header("src/gen/wrapper.h")
         .allowlist_item("rrd_.*")
         .use_core()
+        .opaque_type("_IO_FILE")     // Treat as opaque - we only use FILE*, never sizeof(FILE)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
     if let HeaderLocation::NonStandardLocation(location) = location {
         builder = builder.clang_arg(format!("-I{}", location.to_string_lossy()));
