@@ -40,3 +40,15 @@ jobs:
         dnf install -qy rrdtool-devel curl clang
     - name: Quick check
       uses: ./.github/actions/quick-check
+  arch:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm rrdtool clang pkgconfig
+    - name: Quick check
+      uses: ./.github/actions/quick-check
