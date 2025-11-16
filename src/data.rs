@@ -67,7 +67,7 @@ where
     }
 
     /// The rows of data in the dataset.
-    pub fn rows(&self) -> Rows<T> {
+    pub fn rows(&self) -> Rows<'_, T> {
         Rows { data: self }
     }
 }
@@ -197,7 +197,7 @@ where
     }
 
     /// Iterate over the [`Cell`]s for this row's values.
-    pub fn iter_cells(&self) -> impl Iterator<Item = Cell> {
+    pub fn iter_cells(&self) -> impl Iterator<Item = Cell<'_>> {
         self.data
             .names
             .iter()
