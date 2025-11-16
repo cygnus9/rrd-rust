@@ -13,7 +13,7 @@ jobs:
       image: ubuntu:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["20.04", "22.04", "24.04", "25.04", "25.10"]
+        version: ["20.04", "22.04", "24.04", "25.04", "25.10", "26.04"]
     env:
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
@@ -31,7 +31,7 @@ jobs:
       image: fedora:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["39", "40", "41", "42"]
+        version: ["41", "42", "43", "44"]
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
