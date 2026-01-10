@@ -9,8 +9,7 @@ fn main() {
         return;
     }
 
-    if let Some((location, version)) = configure_rrd() {
-        println!("cargo::metadata=version={}", version);
+    if let Some(location) = configure_rrd() {
         create_bindings(location);
     } else {
         println!("cargo::rustc-cfg=rrdsys_use_pregen");
@@ -23,24 +22,23 @@ enum HeaderLocation {
     StandardLocation,
 }
 
-fn configure_rrd() -> Option<(HeaderLocation, String)> {
+fn configure_rrd() -> Option<HeaderLocation> {
     if let Ok(s) = env::var("LIBRRD") {
         configure_rrd_nonstandard(s)
     } else {
         #[cfg(any(target_family = "unix", target_os = "macos"))]
+        if let Ok(lib) = pkg_config::Config::new()
+            .atleast_version("1.5.0")
+            .probe("librrd")
         {
-            if let Ok(lib) = pkg_config::Config::new().probe("librrd") {
-                if lib.version.as_str() < "1.5.0" {
-                    panic!("librrd version {} is too old, need >= 1.5.0", lib.version);
-                }
-                return Some((HeaderLocation::StandardLocation, lib.version));
-            }
+            println!("cargo::metadata=version={}", lib.version);
+            return Some(HeaderLocation::StandardLocation);
         }
         panic!("Could not find librrd");
     }
 }
 
-fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, String)> {
+fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<HeaderLocation> {
     let p = p.as_ref();
 
     // First setup the linker configuration
@@ -64,9 +62,11 @@ fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, St
         return None;
     }
 
-    let version = get_rrd_version(&include_path, &link_lib);
+    // Try to get the version to confirm it works
+    let version = get_rrd_version(p);
+    println!("cargo::metadata=version={}", version);
 
-    Some((HeaderLocation::NonStandardLocation(include_path.to_owned()), version))
+    Some(HeaderLocation::NonStandardLocation(include_path.to_owned()))
 }
 
 fn create_bindings(location: HeaderLocation) {
@@ -89,13 +89,11 @@ fn create_bindings(location: HeaderLocation) {
         .expect("Couldn't write bindings!");
 }
 
-fn get_rrd_version(include_path: &Path, link_lib: &str) -> String {
-    let link_search = include_path.parent().unwrap().to_string_lossy();
-    let include_path = include_path.to_string_lossy();
-
+fn get_rrd_version(link_lib: &Path) -> String {
     let c_code = r#"
 #include <stdio.h>
-#include <rrd.h>
+
+extern const char* rrd_strversion();
 
 int main() {
     printf("%s\n", rrd_strversion());
@@ -113,9 +111,7 @@ int main() {
     cmd.arg(temp_c_path)
        .arg("-o")
        .arg(&output_path)
-       .arg(format!("-l{}", link_lib))
-       .arg(format!("-I{}", include_path))
-       .arg(format!("-L{}", link_search));
+       .arg(format!("-l{}", link_lib.to_string_lossy()));
 
     if !cmd.status().unwrap().success() {
         panic!("Failed to compile version check program");
