@@ -17,7 +17,7 @@ runs:
       run: rustup component add clippy rustfmt
       shell: bash
     - name: Check formatting
-      run: cargo fmt --check ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
+      run: cargo fmt --check
       shell: bash
       env:
         CARGO_TERM_COLOR: always
