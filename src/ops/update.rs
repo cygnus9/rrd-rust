@@ -38,6 +38,7 @@ pub struct Options {
     /// Silently skip updates older than the last update already present rather than returning an error.
     pub skip_past_updates: bool,
     /// Locking behavior when updating the RRD.
+    #[cfg(feature = "locking_mode")]
     pub locking_mode: LockingMode,
 }
 
@@ -48,12 +49,15 @@ impl Options {
         if self.skip_past_updates {
             bits |= 1;
         }
-        bits |= match self.locking_mode {
-            LockingMode::DEFAULT => 0,
-            LockingMode::NONE => 1 << 7,
-            LockingMode::BLOCK => 2 << 7,
-            LockingMode::TRY => 3 << 7,
-        };
+        #[cfg(feature = "locking_mode")]
+        {
+            bits |= match self.locking_mode {
+                LockingMode::DEFAULT => 0,
+                LockingMode::NONE => 1 << 7,
+                LockingMode::BLOCK => 2 << 7,
+                LockingMode::TRY => 3 << 7,
+            };
+        }
         bits
     }
 }
@@ -62,12 +66,14 @@ impl From<ExtraFlags> for Options {
     fn from(flags: ExtraFlags) -> Self {
         Self {
             skip_past_updates: flags.contains(ExtraFlags::SKIP_PAST_UPDATES),
+            #[cfg(feature = "locking_mode")]
             locking_mode: LockingMode::default(),
         }
     }
 }
 
 /// Locking behavior when updating the RRD.
+#[cfg(feature = "locking_mode")]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LockingMode {
     /// Read $RRD_LOCKING environment or fall back to TRY.
@@ -372,8 +378,23 @@ mod tests {
                 options.skip_past_updates,
                 flags.contains(ExtraFlags::SKIP_PAST_UPDATES)
             );
+            #[cfg(feature = "locking_mode")]
             assert_eq!(options.locking_mode, LockingMode::default());
             assert_eq!(options.bits(), flags.bits());
+        }
+    }
+
+    #[cfg(feature = "locking_mode")]
+    #[test]
+    fn options_locking_mode_bits() {
+        use LockingMode::*;
+        let cases = [(DEFAULT, 0), (NONE, 1 << 7), (BLOCK, 2 << 7), (TRY, 3 << 7)];
+        for (mode, expected_bits) in cases {
+            let options = Options {
+                locking_mode: mode,
+                ..Default::default()
+            };
+            assert_eq!(options.bits(), expected_bits);
         }
     }
 }

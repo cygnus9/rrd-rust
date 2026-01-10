@@ -33,3 +33,7 @@ chrono = "0.4"
 tempfile = "3.15.0"
 anyhow = "1.0.95"
 env_logger = "0.11.6"
+
+[features]
+# Adds support for specifying locking mode when updating RRDs (available since rrdtool 1.9.0)
+locking_mode = []

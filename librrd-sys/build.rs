@@ -1,4 +1,5 @@
-use std::{env, path::{Path, PathBuf}};
+use std::{env, path::{Path, PathBuf}, process::Command, io::Write};
+use tempfile;
 
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(rrdsys_use_pregen)");
@@ -8,7 +9,8 @@ fn main() {
         return;
     }
 
-    if let Some(location) = configure_rrd() {
+    if let Some((location, _link_lib, version)) = configure_rrd() {
+        println!("cargo::metadata=version={}", version);
         create_bindings(location);
     } else {
         println!("cargo::rustc-cfg=rrdsys_use_pregen");
@@ -21,35 +23,38 @@ enum HeaderLocation {
     StandardLocation,
 }
 
-fn configure_rrd() -> Option<HeaderLocation> {
+fn configure_rrd() -> Option<(HeaderLocation, String, String)> {
     if let Ok(s) = env::var("LIBRRD") {
         configure_rrd_nonstandard(s)
     } else {
         #[cfg(any(target_family = "unix", target_os = "macos"))]
         {
-            if pkg_config::Config::new()
-                .atleast_version("1.5.0")
-                .probe("librrd")
-                .is_ok()
-            {
-                return Some(HeaderLocation::StandardLocation);
+            if let Ok(lib) = pkg_config::Config::new().probe("librrd") {
+                if lib.version.as_str() < "1.5.0" {
+                    panic!("librrd version {} is too old, need >= 1.5.0", lib.version);
+                }
+                return Some((HeaderLocation::StandardLocation, "rrd".to_string(), lib.version));
             }
         }
         panic!("Could not find librrd");
     }
 }
 
-fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<HeaderLocation> {
+fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, String, String)> {
     let p = p.as_ref();
 
     // First setup the linker configuration
     assert!(p.is_file());
-    let link_lib = Path::new(p.file_name().expect("no file name in LIBRRD env"))
+    let link_lib_base = Path::new(p.file_name().expect("no file name in LIBRRD env"))
         .file_stem()
         .unwrap()
-        .to_string_lossy();
-    #[cfg(any(target_family = "unix", target_os = "macos"))]
-    let link_lib = link_lib.strip_prefix("lib").unwrap();
+        .to_string_lossy()
+        .into_owned();
+    let link_lib = if cfg!(any(target_family = "unix", target_os = "macos")) {
+        link_lib_base.strip_prefix("lib").unwrap().to_string()
+    } else {
+        link_lib_base
+    };
     let link_search = p
         .parent()
         .expect("no library path in LIBRRD env")
@@ -63,7 +68,10 @@ fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<HeaderLocation> {
         return None;
     }
 
-    Some(HeaderLocation::NonStandardLocation(include_path.to_owned()))
+    let location = HeaderLocation::NonStandardLocation(include_path.to_owned());
+    let version = get_rrd_version(&location, &link_lib);
+
+    Some((location, link_lib, version))
 }
 
 fn create_bindings(location: HeaderLocation) {
@@ -84,4 +92,53 @@ fn create_bindings(location: HeaderLocation) {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
+}
+
+fn get_rrd_version(location: &HeaderLocation, link_lib: &str) -> String {
+    let include_path = match location {
+        HeaderLocation::StandardLocation => {
+            let lib = pkg_config::Config::new().probe("librrd").unwrap();
+            lib.include_paths.first().unwrap().to_string_lossy().into_owned()
+        }
+        HeaderLocation::NonStandardLocation(p) => p.to_string_lossy().into_owned(),
+    };
+
+    let c_code = r#"
+#include <stdio.h>
+#include <rrd.h>
+
+int main() {
+    printf("%s\n", rrd_strversion());
+    return 0;
+}
+"#;
+
+    let mut temp_c = tempfile::Builder::new().suffix(".c").tempfile().unwrap();
+    temp_c.write_all(c_code.as_bytes()).unwrap();
+    let temp_c_path = temp_c.path();
+
+    let output_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("version_check");
+
+    let mut cmd = Command::new("gcc");
+    cmd.arg(temp_c_path)
+       .arg("-o")
+       .arg(&output_path)
+       .arg(format!("-l{}", link_lib))
+       .arg(format!("-I{}", include_path));
+
+    if let HeaderLocation::NonStandardLocation(p) = location {
+        let link_search = p.parent().unwrap().to_string_lossy();
+        cmd.arg(format!("-L{}", link_search));
+    }
+
+    if !cmd.status().unwrap().success() {
+        panic!("Failed to compile version check program");
+    }
+
+    let output = Command::new(&output_path).output().unwrap();
+    if !output.status.success() {
+        panic!("Failed to run version check program");
+    }
+
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
 }

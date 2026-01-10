@@ -14,11 +14,13 @@ description = """
 Bindings to librrd to create and interact with round robin databases created with Tobias
 Oetiker's rrdtool (https://www.rrdtool.org/).
 """
+links = "rrd"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
 bindgen = "0.71.1"
+tempfile = "3.15.0"
 
 [target.'cfg(macos)'.build-dependencies]
 pkg-config = "0.3"
