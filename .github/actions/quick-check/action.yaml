@@ -1,5 +1,10 @@
 name: Quick check
 description: Build and verify the package
+inputs:
+  locking_mode:
+    description: 'Enable locking mode feature'
+    required: false
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -28,7 +33,7 @@ runs:
         CARGO_TERM_COLOR: always
         RUSTDOCFLAGS: -D warnings
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
       shell: bash
       env:
         CARGO_TERM_COLOR: always
