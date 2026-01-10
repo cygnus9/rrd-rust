@@ -17,23 +17,23 @@ runs:
       run: rustup component add clippy rustfmt
       shell: bash
     - name: Check formatting
-      run: cargo fmt --check
+      run: cargo fmt --check ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
       shell: bash
       env:
         CARGO_TERM_COLOR: always
     - name: Build
-      run: cargo build --verbose
+      run: cargo build ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
       shell: bash
       env:
         CARGO_TERM_COLOR: always
     - name: Check docs
-      run: cargo doc --no-deps
+      run: cargo doc --no-deps ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
       shell: bash
       env:
         CARGO_TERM_COLOR: always
         RUSTDOCFLAGS: -D warnings
     - name: Run tests
-      run: cargo test --verbose ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
+      run: cargo test ${{ inputs.locking_mode == 'true' && '--features locking_mode' || '' }}
       shell: bash
       env:
         CARGO_TERM_COLOR: always
