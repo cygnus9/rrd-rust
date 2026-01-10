@@ -19,6 +19,7 @@ use crate::{
     Timestamp,
 };
 use log::debug;
+use nom::Parser;
 use nom::{bytes, character::complete, combinator, sequence, Finish};
 use std::{collections, ffi::CString, fmt::Write as _};
 
@@ -207,12 +208,12 @@ impl std::str::FromStr for Color {
         combinator::map(
             combinator::all_consuming(sequence::preceded(
                 bytes::complete::tag("#"),
-                sequence::tuple((
+                (
                     parse_hex_byte,
                     parse_hex_byte,
                     parse_hex_byte,
                     combinator::opt(parse_hex_byte),
-                )),
+                ),
             )),
             |(red, green, blue, alpha)| Color {
                 red,
@@ -220,7 +221,8 @@ impl std::str::FromStr for Color {
                 blue,
                 alpha,
             },
-        )(s)
+        )
+        .parse_complete(s)
         .finish()
         .map_err(|_| InvalidArgument("Invalid color"))
         .map(|(_rem, c)| c)
@@ -256,7 +258,8 @@ fn parse_hex_byte(input: &str) -> nom::IResult<&str, u8> {
 
             Some((hi << 4) | lo)
         },
-    )(input)
+    )
+    .parse_complete(input)
 }
 
 #[cfg(test)]

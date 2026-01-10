@@ -19,8 +19,8 @@ links = "rrd"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-bindgen = "0.71.1"
-tempfile = "3.15.0"
+bindgen = "0.72"
+tempfile = "3.15"
 
 [target.'cfg(macos)'.build-dependencies]
 pkg-config = "0.3"
