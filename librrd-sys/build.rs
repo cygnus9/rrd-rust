@@ -9,7 +9,7 @@ fn main() {
         return;
     }
 
-    if let Some((location, _link_lib, version)) = configure_rrd() {
+    if let Some((location, version)) = configure_rrd() {
         println!("cargo::metadata=version={}", version);
         create_bindings(location);
     } else {
@@ -23,7 +23,7 @@ enum HeaderLocation {
     StandardLocation,
 }
 
-fn configure_rrd() -> Option<(HeaderLocation, String, String)> {
+fn configure_rrd() -> Option<(HeaderLocation, String)> {
     if let Ok(s) = env::var("LIBRRD") {
         configure_rrd_nonstandard(s)
     } else {
@@ -33,28 +33,24 @@ fn configure_rrd() -> Option<(HeaderLocation, String, String)> {
                 if lib.version.as_str() < "1.5.0" {
                     panic!("librrd version {} is too old, need >= 1.5.0", lib.version);
                 }
-                return Some((HeaderLocation::StandardLocation, "rrd".to_string(), lib.version));
+                return Some((HeaderLocation::StandardLocation, lib.version));
             }
         }
         panic!("Could not find librrd");
     }
 }
 
-fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, String, String)> {
+fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, String)> {
     let p = p.as_ref();
 
     // First setup the linker configuration
     assert!(p.is_file());
-    let link_lib_base = Path::new(p.file_name().expect("no file name in LIBRRD env"))
+    let link_lib = Path::new(p.file_name().expect("no file name in LIBRRD env"))
         .file_stem()
         .unwrap()
-        .to_string_lossy()
-        .into_owned();
-    let link_lib = if cfg!(any(target_family = "unix", target_os = "macos")) {
-        link_lib_base.strip_prefix("lib").unwrap().to_string()
-    } else {
-        link_lib_base
-    };
+        .to_string_lossy();
+    #[cfg(any(target_family = "unix", target_os = "macos"))]
+    let link_lib = link_lib.strip_prefix("lib").unwrap();
     let link_search = p
         .parent()
         .expect("no library path in LIBRRD env")
@@ -68,10 +64,9 @@ fn configure_rrd_nonstandard<T: AsRef<Path>>(p: T) -> Option<(HeaderLocation, St
         return None;
     }
 
-    let location = HeaderLocation::NonStandardLocation(include_path.to_owned());
-    let version = get_rrd_version(&location, &link_lib);
+    let version = get_rrd_version(&include_path, &link_lib);
 
-    Some((location, link_lib, version))
+    Some((HeaderLocation::NonStandardLocation(include_path.to_owned()), version))
 }
 
 fn create_bindings(location: HeaderLocation) {
@@ -94,14 +89,9 @@ fn create_bindings(location: HeaderLocation) {
         .expect("Couldn't write bindings!");
 }
 
-fn get_rrd_version(location: &HeaderLocation, link_lib: &str) -> String {
-    let include_path = match location {
-        HeaderLocation::StandardLocation => {
-            let lib = pkg_config::Config::new().probe("librrd").unwrap();
-            lib.include_paths.first().unwrap().to_string_lossy().into_owned()
-        }
-        HeaderLocation::NonStandardLocation(p) => p.to_string_lossy().into_owned(),
-    };
+fn get_rrd_version(include_path: &Path, link_lib: &str) -> String {
+    let link_search = include_path.parent().unwrap().to_string_lossy();
+    let include_path = include_path.to_string_lossy();
 
     let c_code = r#"
 #include <stdio.h>
@@ -119,17 +109,13 @@ int main() {
 
     let output_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("version_check");
 
-    let mut cmd = Command::new("gcc");
+    let mut cmd = Command::new("cc");
     cmd.arg(temp_c_path)
        .arg("-o")
        .arg(&output_path)
        .arg(format!("-l{}", link_lib))
-       .arg(format!("-I{}", include_path));
-
-    if let HeaderLocation::NonStandardLocation(p) = location {
-        let link_search = p.parent().unwrap().to_string_lossy();
-        cmd.arg(format!("-L{}", link_search));
-    }
+       .arg(format!("-I{}", include_path))
+       .arg(format!("-L{}", link_search));
 
     if !cmd.status().unwrap().success() {
         panic!("Failed to compile version check program");
