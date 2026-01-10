@@ -67,7 +67,7 @@ fn tutorial() -> anyhow::Result<()> {
 
     // updates done in chunks of 3
     for chunk in update_data.chunks(3) {
-        update::update_all(&rrd_path, update::ExtraFlags::empty(), chunk)?;
+        update::update_all(&rrd_path, update::Options::default(), chunk)?;
     }
 
     let fetched = fetch::fetch(

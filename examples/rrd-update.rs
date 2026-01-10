@@ -35,7 +35,7 @@ fn main() {
 
     let rc = update::update_all(
         filename,
-        update::ExtraFlags::empty(),
+        update::Options::default(),
         &[(update::BatchTime::Now, &[235.into(), 12.3.into()])],
     );
     match rc {

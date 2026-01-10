@@ -22,11 +22,63 @@ bitflags! {
     /// use rrd::ops::update::ExtraFlags;
     /// let no_flags = ExtraFlags::empty();
     /// ```
+    #[derive(Clone, Copy)]
     pub struct ExtraFlags : rrd_int {
         /// Silently skip updates older than the last update already present rather than returning
         /// an error.
         const SKIP_PAST_UPDATES = 0x01;
     }
+}
+
+/// Options to alter update behavior.
+///
+/// This is an alternative to using `ExtraFlags`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Options {
+    /// Silently skip updates older than the last update already present rather than returning an error.
+    pub skip_past_updates: bool,
+    /// Locking behavior when updating the RRD.
+    pub locking_mode: LockingMode,
+}
+
+impl Options {
+    /// Get the bitflags representation of these options.
+    pub fn bits(&self) -> rrd_int {
+        let mut bits = 0;
+        if self.skip_past_updates {
+            bits |= 1;
+        }
+        bits |= match self.locking_mode {
+            LockingMode::DEFAULT => 0,
+            LockingMode::NONE => 1 << 7,
+            LockingMode::BLOCK => 2 << 7,
+            LockingMode::TRY => 3 << 7,
+        };
+        bits
+    }
+}
+
+impl From<ExtraFlags> for Options {
+    fn from(flags: ExtraFlags) -> Self {
+        Self {
+            skip_past_updates: flags.contains(ExtraFlags::SKIP_PAST_UPDATES),
+            locking_mode: LockingMode::default(),
+        }
+    }
+}
+
+/// Locking behavior when updating the RRD.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum LockingMode {
+    /// Read $RRD_LOCKING environment or fall back to TRY.
+    #[default]
+    DEFAULT,
+    /// No locking; caller is responsible to ensure that the file is not used elsewhere.
+    NONE,
+    /// Wait until lock is available.
+    BLOCK,
+    /// Try to lock but fail when file is used elsewhere (default).
+    TRY,
 }
 
 /// Update all data sources in the RRD.
@@ -54,14 +106,16 @@ bitflags! {
 ///         &[(BatchTime::Now, &[1_u64.into(), 2_f64.into()])])
 /// }
 /// ```
-pub fn update_all<'a, D, B, I>(filename: &Path, extra_flags: ExtraFlags, data: I) -> RrdResult<()>
+pub fn update_all<'a, D, B, I, O>(filename: &Path, update_options: O, data: I) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
     B: borrow::Borrow<(BatchTime, D)>,
     I: IntoIterator<Item = B>,
+    O: Into<Options>,
 {
     let filename = CString::new(path_to_str(filename)?)?;
     let args = build_datum_args(data, None)?;
+    let extra_flags = update_options.into().bits();
 
     debug!("Update: file={filename:?} extra_flags=0x{extra_flags:02x} args={args:?}",);
 
@@ -69,7 +123,7 @@ where
         rrd_sys::rrd_updatex_r(
             filename.as_ptr(),
             null(),
-            extra_flags.bits(),
+            extra_flags,
             args.len() as rrd_int,
             args.as_ptr(),
         )
@@ -300,13 +354,26 @@ mod tests {
     where
         I: IntoIterator<Item = &'a (BatchTime, [Datum; 1])>,
     {
-        update_all(rrd_path, ExtraFlags::empty(), data)
+        update_all(rrd_path, Options::default(), data)
     }
 
     fn call_update_with_tuple_vals(
         rrd_path: &Path,
         data: impl IntoIterator<Item = (BatchTime, [Datum; 1])>,
     ) -> RrdResult<()> {
-        update_all(rrd_path, ExtraFlags::empty(), data)
+        update_all(rrd_path, Options::default(), data)
+    }
+
+    #[test]
+    fn convert_extra_flags_to_options() {
+        for flags in [ExtraFlags::empty(), ExtraFlags::SKIP_PAST_UPDATES] {
+            let options: Options = flags.into();
+            assert_eq!(
+                options.skip_past_updates,
+                flags.contains(ExtraFlags::SKIP_PAST_UPDATES)
+            );
+            assert_eq!(options.locking_mode, LockingMode::default());
+            assert_eq!(options.bits(), flags.bits());
+        }
     }
 }
