@@ -78,6 +78,14 @@ fn create_bindings(location: HeaderLocation) {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
     if let HeaderLocation::NonStandardLocation(location) = location {
         builder = builder.clang_arg(format!("-I{}", location.to_string_lossy()));
+    } else {
+        let library = pkg_config::probe_library("librrd").expect("Could not find librrd anymore");
+        builder = builder.clang_args(
+            library
+                .include_paths
+                .iter()
+                .map(|path| format!("-I{}", path.to_string_lossy())),
+        );
     }
     let bindings = builder
         .generate()
