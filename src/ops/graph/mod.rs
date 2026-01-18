@@ -32,34 +32,10 @@ pub fn graph(
     props: GraphProps,
     elements: &[GraphElement],
 ) -> RrdResult<(Vec<u8>, GraphMetadata)> {
-    // detect error conditions that will confusingly produce no librrd output whatsoever
-    if !elements.iter().any(|c| matches!(c, GraphElement::Def(_))) {
-        return Err(RrdError::InvalidArgument(
-            "Must have at least one Def element".to_string(),
-        ));
-    }
-    if !elements.iter().any(|c| {
-        matches!(
-            c,
-            GraphElement::Print(_)
-                | GraphElement::GPrint(_)
-                | GraphElement::Line(_)
-                | GraphElement::Area(_)
-        )
-    }) {
-        return Err(RrdError::InvalidArgument(
-            "Must have at least one Line, Area, GPrint, or Print element".to_string(),
-        ));
-    }
-
     // Need to include initial "graphv" command since that's how `rrdtool` invokes rrd_graph_v.
     // Filename `-` means include image data in the return hash rather than writing to a file
     let mut args = vec!["graphv".to_string(), "-".to_string()];
-    image_format.append_to(&mut args)?;
-    props.append_to(&mut args)?;
-    for c in elements {
-        c.append_to(&mut args)?;
-    }
+    args.extend(graph_args(Some(image_format), props, elements)?);
 
     debug!("Graph: args={args:?}");
     let args = args
@@ -121,6 +97,47 @@ pub fn graph(
             extra_info: info,
         },
     ))
+}
+
+/// Returns a vector of graph arguments.
+///
+/// Use this function to build command line or CGI template for a `RRD::GRAPH` tag.
+///
+/// See <https://oss.oetiker.ch/rrdtool/doc/rrdcgi.en.html>.
+pub fn graph_args(
+    image_format: Option<ImageFormat>,
+    props: GraphProps,
+    elements: &[GraphElement],
+) -> RrdResult<Vec<String>> {
+    // detect error conditions that will confusingly produce no librrd output whatsoever
+    if !elements.iter().any(|c| matches!(c, GraphElement::Def(_))) {
+        return Err(RrdError::InvalidArgument(
+            "Must have at least one Def element".to_string(),
+        ));
+    }
+    if !elements.iter().any(|c| {
+        matches!(
+            c,
+            GraphElement::Print(_)
+                | GraphElement::GPrint(_)
+                | GraphElement::Line(_)
+                | GraphElement::Area(_)
+        )
+    }) {
+        return Err(RrdError::InvalidArgument(
+            "Must have at least one Line, Area, GPrint, or Print element".to_string(),
+        ));
+    }
+
+    let mut args = Vec::new();
+    if let Some(image_format) = image_format {
+        image_format.append_to(&mut args)?;
+    }
+    props.append_to(&mut args)?;
+    for c in elements {
+        c.append_to(&mut args)?;
+    }
+    Ok(args)
 }
 
 /// Metadata about a rendered graph.
@@ -310,5 +327,53 @@ mod tests {
         assert!("#FFFFFFF".parse::<Color>().is_err());
         // too long
         assert!("#FFFFFFFFF".parse::<Color>().is_err());
+    }
+
+    #[test]
+    fn cgi_template() {
+        let var_name: elements::VarName = "myspeed".try_into().unwrap();
+        let rrd_path = std::path::PathBuf::from("data.rrd");
+        let args = graph_args(
+            Some(props::ImageFormat::Png),
+            props::GraphProps::default(),
+            &[
+                elements::Def {
+                    var_name: var_name.clone(),
+                    rrd: rrd_path,
+                    ds_name: "speed".to_string(),
+                    consolidation_fn: crate::ConsolidationFn::Avg,
+                    step: None,
+                    start: None,
+                    end: None,
+                    reduce: None,
+                }
+                .into(),
+                elements::Line {
+                    width: 2.0,
+                    value: var_name,
+                    color: Some(elements::ColorWithLegend {
+                        color: Color {
+                            red: 0xff,
+                            green: 0x00,
+                            blue: 0x00,
+                            alpha: None,
+                        },
+                        legend: None,
+                    }),
+                    stack: false,
+                    skip_scale: false,
+                    dashes: None,
+                }
+                .into(),
+            ],
+        )
+        .unwrap();
+        let expected_args = vec![
+            "--imgformat".to_string(),
+            "PNG".to_string(),
+            "DEF:myspeed=data.rrd:speed:AVERAGE".to_string(),
+            "LINE2:myspeed#FF0000".to_string(),
+        ];
+        assert_eq!(args, expected_args);
     }
 }
