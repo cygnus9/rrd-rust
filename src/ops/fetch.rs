@@ -131,6 +131,8 @@ impl Drop for Array {
     }
 }
 
+unsafe impl Send for Array {}
+
 impl Deref for Array {
     type Target = [rrd_double];
 
