@@ -7,33 +7,12 @@ use crate::{
     util::{path_to_str, ArrayOfStrings},
     Timestamp,
 };
-use bitflags::bitflags;
 use itertools::Itertools;
 use log::debug;
 use rrd_sys::rrd_int;
 use std::{borrow, ffi::CString, fmt::Write, path::Path, ptr::null};
 
-bitflags! {
-    /// Flags to alter update behavior.
-    ///
-    /// # Examples
-    ///
-    /// No flags:
-    /// ```
-    /// use rrd::ops::update::ExtraFlags;
-    /// let no_flags = ExtraFlags::empty();
-    /// ```
-    #[derive(Clone, Copy)]
-    pub struct ExtraFlags : rrd_int {
-        /// Silently skip updates older than the last update already present rather than returning
-        /// an error.
-        const SKIP_PAST_UPDATES = 0x01;
-    }
-}
-
 /// Options to alter update behavior.
-///
-/// This is an alternative to using `ExtraFlags`.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Options {
     /// Silently skip updates older than the last update already present rather than returning an error.
@@ -61,16 +40,6 @@ impl Options {
             };
         }
         bits
-    }
-}
-
-impl From<ExtraFlags> for Options {
-    fn from(flags: ExtraFlags) -> Self {
-        Self {
-            skip_past_updates: flags.contains(ExtraFlags::SKIP_PAST_UPDATES),
-            #[cfg(feature = "locking_mode")]
-            locking_mode: LockingMode::default(),
-        }
     }
 }
 
@@ -104,12 +73,12 @@ pub enum LockingMode {
 /// ```
 /// use std::path::Path;
 /// use rrd::error::RrdResult;
-/// use rrd::ops::update::{update_all, BatchTime, ExtraFlags};
+/// use rrd::ops::update::{update_all, BatchTime, Options};
 ///
 /// fn add_some_data(f: &Path) -> RrdResult<()> {
 ///     update_all(
 ///         f,
-///         ExtraFlags::empty(),
+///         Options::default(),
 ///         // 1 data point per DS at each timestamp
 ///         &[(BatchTime::Now, &[1_u64.into(), 2_f64.into()])])
 /// }
@@ -164,14 +133,14 @@ where
 /// ```
 /// use std::path::Path;
 /// use rrd::error::RrdResult;
-/// use rrd::ops::update::{update, BatchTime, ExtraFlags};
+/// use rrd::ops::update::{update, BatchTime, Options};
 ///
 /// fn add_some_data(f: &Path) -> RrdResult<()> {
 ///     update(
 ///         f,
 ///         // Other DSs will have "unknown" data at the provided timestamps
 ///         &["ds2"],
-///         ExtraFlags::empty(),
+///         Options::default(),
 ///         // 1 data point per listed DS above at each timestamp
 ///         &[(BatchTime::Now, &[2_f64.into()])])
 /// }
@@ -182,20 +151,22 @@ where
 ///
 /// # Errors
 /// Returns an error if the RRD file cannot be updated or if the data is invalid.
-pub fn update<'a, D, B, I>(
+pub fn update<'a, D, B, I, O>(
     filename: &Path,
     ds_names: &[&str],
-    extra_flags: ExtraFlags,
+    update_options: O,
     data: I,
 ) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
     B: borrow::Borrow<(BatchTime, D)>,
     I: IntoIterator<Item = B>,
+    O: Into<Options>,
 {
     let filename = CString::new(path_to_str(filename)?)?;
     let template = CString::new(ds_names.iter().join(":"))?;
     let args = build_datum_args(data, Some(ds_names.len()))?;
+    let extra_flags = update_options.into().bits();
 
     debug!(
         "Update: file={filename:?} template={template:?} extra_flags=0x{extra_flags:02x} args={args:?}",
@@ -205,7 +176,7 @@ where
         rrd_sys::rrd_updatex_r(
             filename.as_ptr(),
             template.as_ptr(),
-            extra_flags.bits(),
+            extra_flags,
             rrd_int::try_from(args.len()).expect("too many args"),
             args.as_ptr(),
         )
@@ -376,20 +347,6 @@ mod tests {
         data: impl IntoIterator<Item = (BatchTime, [Datum; 1])>,
     ) -> RrdResult<()> {
         update_all(rrd_path, Options::default(), data)
-    }
-
-    #[test]
-    fn convert_extra_flags_to_options() {
-        for flags in [ExtraFlags::empty(), ExtraFlags::SKIP_PAST_UPDATES] {
-            let options: Options = flags.into();
-            assert_eq!(
-                options.skip_past_updates,
-                flags.contains(ExtraFlags::SKIP_PAST_UPDATES)
-            );
-            #[cfg(feature = "locking_mode")]
-            assert_eq!(options.locking_mode, LockingMode::default());
-            assert_eq!(options.bits(), flags.bits());
-        }
     }
 
     #[cfg(feature = "locking_mode")]

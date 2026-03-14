@@ -47,7 +47,7 @@ fn main() {
         let x = offset as f64 * PI / 300f64;
         update_all(
             filename,
-            update::ExtraFlags::empty(),
+            update::Options::default(),
             &[(
                 (start + Duration::from_secs(offset)).into(),
                 &[update::Datum::Float(x.sin()), update::Datum::Float(x.cos())],

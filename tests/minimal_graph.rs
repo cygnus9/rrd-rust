@@ -46,7 +46,7 @@ fn minimal_graph() -> anyhow::Result<()> {
     update::update(
         &rrd_path,
         &[ds_name],
-        update::ExtraFlags::empty(),
+        update::Options::default(),
         &[
             (data_point_time.into(), [10.into()]),
             (
