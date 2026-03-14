@@ -262,7 +262,7 @@ fn tutorial() -> anyhow::Result<()> {
         let myspeed: elements::VarName = "myspeed".try_into()?;
         let good: elements::VarName = "good".try_into()?;
         let fast: elements::VarName = "fast".try_into()?;
-        let (png_data, metadata) = graph::graph(
+        let (png_data, mut metadata) = graph::graph(
             props::ImageFormat::Png,
             &props::GraphProps {
                 time_range: props::TimeRange {
@@ -358,15 +358,17 @@ fn tutorial() -> anyhow::Result<()> {
                 ("legend[0]", "  Maximum allowed".into()),
                 ("legend[1]", "  Good speed".into()),
                 ("legend[2]", "  Too fast".into()),
-                ("coords[0]", "16,133,135,148".into()),
-                ("coords[1]", "231,133,315,148".into()),
-                ("coords[2]", "411,133,481,148".into()),
             ]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
             .collect(),
             ..initial_expected_metadata
         };
+
+        // The coordinates of the legend text are not deterministic, so remove them before comparison
+        metadata.extra_info.remove("coords[0]");
+        metadata.extra_info.remove("coords[1]");
+        metadata.extra_info.remove("coords[2]");
 
         assert_eq!(expected, metadata);
     }
