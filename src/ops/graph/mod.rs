@@ -6,6 +6,7 @@ pub mod elements;
 pub mod props;
 
 use crate::error::InvalidArgument;
+use crate::TimestampExt;
 use crate::{
     error::{get_rrd_error, RrdError, RrdResult},
     ops::{
@@ -69,15 +70,10 @@ pub fn graph(
     let graph_height = extract_info_value(&mut info, "graph_height", |v| v.into_count())?;
     let image_width = extract_info_value(&mut info, "image_width", |v| v.into_count())?;
     let image_height = extract_info_value(&mut info, "image_height", |v| v.into_count())?;
-    let graph_start =
-        extract_info_value(&mut info, "graph_start", |v| v.into_count()).map(|t| {
-            Timestamp::from_timestamp(t.try_into().expect("Graph start overflow"), 0)
-                .expect("Impossible graph start")
-        })?;
-    let graph_end = extract_info_value(&mut info, "graph_end", |v| v.into_count()).map(|t| {
-        Timestamp::from_timestamp(t.try_into().expect("Graph end overflow"), 0)
-            .expect("Impossible graph end")
-    })?;
+    let graph_start = extract_info_value(&mut info, "graph_start", |v| v.into_count())
+        .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph start overflow")))?;
+    let graph_end = extract_info_value(&mut info, "graph_end", |v| v.into_count())
+        .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph end overflow")))?;
     let value_min = extract_info_value(&mut info, "value_min", |v| v.into_value())?;
     let value_max = extract_info_value(&mut info, "value_max", |v| v.into_value())?;
 

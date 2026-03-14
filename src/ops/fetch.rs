@@ -65,14 +65,12 @@ pub fn fetch(
     assert!(resolution > 0);
 
     // Move forward one step -- first timestamp's data is included in the time that ends one step ahead
-    let start = Timestamp::from_timestamp(
+    let start = Timestamp::from_time_t(
         start
             .checked_add(i64::try_from(resolution).expect("Resolution i64 overflow"))
             .expect("Start overflow"),
-        0,
-    )
-    .expect("Impossible start");
-    let end = Timestamp::from_timestamp(end, 0).expect("Impossible end");
+    );
+    let end = Timestamp::from_time_t(end);
 
     let ds_count_usize = ds_count.try_into().expect("Count overflow");
 
@@ -90,8 +88,8 @@ pub fn fetch(
     };
 
     let rows = (usize::try_from(
-        end.timestamp()
-            .checked_sub(start.timestamp())
+        end.as_time_t()
+            .checked_sub(start.as_time_t())
             .expect("Negative time range"),
     )
     .expect("Time range overflow")

@@ -13,8 +13,6 @@ fn main() {
             major > 1 || (major == 1 && minor >= 9)
         };
 
-        if !locking_available {
-            panic!("locking_mode feature requires librrd >= 1.9.0, but found version {version}");
-        }
+        assert!(locking_available, "locking_mode feature requires librrd >= 1.9.0, but found version {version}");
     }
 }

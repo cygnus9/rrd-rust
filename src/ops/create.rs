@@ -42,7 +42,7 @@ pub fn create<'a>(
 
     debug!(
         "Create: file={filename:?} start={} step={} no_overwrite={no_overwrite} template={template:?} sources={sources:?} args={args:?}",
-        start.timestamp(),
+        start.as_time_t(),
         step.as_secs()
     );
 

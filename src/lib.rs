@@ -22,22 +22,27 @@ pub mod error;
 pub mod ops;
 pub mod util;
 
-// `chrono::DateTime` and `chrono::Utc` are used for timestamps, so this is provided to allow
-// easy access without a separate `chrono` dependency.
-pub use chrono;
-
 /// The point in time associated with a data point.
-pub type Timestamp = chrono::DateTime<chrono::Utc>;
+pub type Timestamp = std::time::SystemTime;
 
 /// Internal extensions for [`Timestamp`]
 pub(crate) trait TimestampExt {
     /// Returns the timestamp as seconds since epoch.
     fn as_time_t(&self) -> rrd_sys::time_t;
+
+    /// Creates a timestamp from seconds since epoch.
+    fn from_time_t(time_t: rrd_sys::time_t) -> Self;
 }
 
 impl TimestampExt for Timestamp {
     fn as_time_t(&self) -> rrd_sys::time_t {
-        self.timestamp()
+        self.duration_since(std::time::UNIX_EPOCH)
+            .expect("Timestamp must be after UNIX_EPOCH")
+            .as_secs() as rrd_sys::time_t
+    }
+
+    fn from_time_t(time_t: rrd_sys::time_t) -> Self {
+        std::time::UNIX_EPOCH + std::time::Duration::from_secs(time_t as u64)
     }
 }
 

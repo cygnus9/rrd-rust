@@ -2,6 +2,7 @@
 
 use crate::error::{InvalidArgument, RrdResult};
 use crate::ops::graph::Color;
+use crate::TimestampExt;
 use crate::{ops::graph::AppendArgs, Timestamp};
 use std::collections;
 
@@ -71,11 +72,11 @@ impl AppendArgs for TimeRange {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         if let Some(s) = &self.start {
             args.push("--start".to_string());
-            args.push(format!("{}", s.timestamp()));
+            args.push(format!("{}", s.as_time_t()));
         }
         if let Some(e) = &self.end {
             args.push("--end".to_string());
-            args.push(format!("{}", e.timestamp()));
+            args.push(format!("{}", e.as_time_t()));
         }
         if let Some(ss) = &self.step_seconds {
             args.push("--step".to_string());
@@ -835,8 +836,8 @@ mod tests {
     fn everything_set() {
         let props = GraphProps {
             time_range: TimeRange {
-                start: Some(chrono::DateTime::from_timestamp(1_000, 0).unwrap()),
-                end: Some(chrono::DateTime::from_timestamp(100_000, 0).unwrap()),
+                start: Some(Timestamp::from_time_t(1_000)),
+                end: Some(Timestamp::from_time_t(100_000)),
                 step_seconds: Some(60),
             },
             labels: Labels {

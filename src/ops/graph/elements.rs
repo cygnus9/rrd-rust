@@ -25,7 +25,7 @@ use crate::{
     error::{InvalidArgument, RrdResult},
     ops::graph::{AppendArgs, Color},
     util::path_to_str,
-    ConsolidationFn, Timestamp,
+    ConsolidationFn, Timestamp, TimestampExt,
 };
 use itertools::Itertools;
 use std::{fmt::Write as _, path::PathBuf, sync};
@@ -103,10 +103,10 @@ impl AppendArgs for Def {
             write!(s, ":step={step}").unwrap();
         }
         if let Some(start) = self.start {
-            write!(s, ":start={}", start.timestamp()).unwrap();
+            write!(s, ":start={}", start.as_time_t()).unwrap();
         }
         if let Some(end) = self.end {
-            write!(s, ":end={}", end.timestamp()).unwrap();
+            write!(s, ":end={}", end.as_time_t()).unwrap();
         }
         if let Some(reduce) = self.reduce {
             write!(s, ":reduce={}", reduce.as_arg_str()).unwrap();
@@ -355,7 +355,7 @@ impl Value {
     fn append_to(&self, s: &mut String) {
         match self {
             Value::Variable(v) => write!(s, "{}", v.name),
-            Value::Timestamp(t) => write!(s, "{}", t.timestamp()),
+            Value::Timestamp(t) => write!(s, "{}", t.as_time_t()),
             Value::Constant(f) => {
                 write!(s, "{}", f)
             }
@@ -768,8 +768,8 @@ mod tests {
             ds_name: "DS1".to_string(),
             consolidation_fn: ConsolidationFn::Avg,
             step: Some(1),
-            start: Some(chrono::DateTime::from_timestamp(100, 0).unwrap()),
-            end: Some(chrono::DateTime::from_timestamp(1000, 0).unwrap()),
+            start: Some(Timestamp::from_time_t(100)),
+            end: Some(Timestamp::from_time_t(1000)),
             reduce: Some(ConsolidationFn::Max),
         }
         .append_to(&mut args)
@@ -886,7 +886,7 @@ mod tests {
     fn hrule() {
         let mut args = vec![];
         HRule {
-            value: Value::Timestamp(Timestamp::from_timestamp(1000, 0).unwrap()),
+            value: Value::Timestamp(Timestamp::from_time_t(1000)),
             color: "#010203".parse().unwrap(),
             legend: None,
             dashes: Some(Dashes {

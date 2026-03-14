@@ -1,6 +1,7 @@
 //! Update (i.e. add data to) an RRD.
 
 use crate::error::RrdError;
+use crate::TimestampExt;
 use crate::{
     error::{return_code_to_result, RrdResult},
     util::{path_to_str, ArrayOfStrings},
@@ -265,7 +266,7 @@ where
                     timestamp_arg.push('N');
                 }
                 BatchTime::Timestamp(ts) => {
-                    write!(timestamp_arg, "{}", ts.timestamp())
+                    write!(timestamp_arg, "{}", ts.as_time_t())
                         .expect("Writing to a String can't fail");
                 }
             }
@@ -306,10 +307,7 @@ mod tests {
 
         call_update_with_tuple_refs(
             &rrd_path,
-            &[(
-                Timestamp::from_timestamp(920804460, 0).unwrap().into(),
-                [100_u64.into()],
-            )],
+            &[(Timestamp::from_time_t(920804460).into(), [100_u64.into()])],
         )?;
 
         Ok(())
@@ -324,10 +322,7 @@ mod tests {
 
         call_update_with_tuple_vals(
             &rrd_path,
-            [(
-                Timestamp::from_timestamp(920804460, 0).unwrap().into(),
-                [100_u64.into()],
-            )],
+            [(Timestamp::from_time_t(920804460).into(), [100_u64.into()])],
         )?;
 
         Ok(())
@@ -336,7 +331,7 @@ mod tests {
     fn create(rrd_path: &Path) -> anyhow::Result<()> {
         create::create(
             rrd_path,
-            Timestamp::from_timestamp(920804400, 0).unwrap(),
+            Timestamp::from_time_t(920804400),
             time::Duration::from_secs(300),
             true,
             None,

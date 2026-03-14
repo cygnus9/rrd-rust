@@ -2,14 +2,17 @@ use rrd::{
     ops::{create, update},
     ConsolidationFn,
 };
-use std::{path::Path, time::Duration};
+use std::{
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 fn main() {
     let filename = Path::new("db.rrd");
 
     create::create(
         filename,
-        chrono::Utc::now(),
+        SystemTime::now(),
         Duration::from_secs(1),
         false,
         None,

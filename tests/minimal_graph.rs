@@ -5,7 +5,7 @@ use rrd::{
         graph::{elements, props},
         update,
     },
-    ConsolidationFn, Timestamp,
+    ConsolidationFn,
 };
 use std::{path, time};
 
@@ -27,7 +27,7 @@ fn minimal_graph() -> anyhow::Result<()> {
     create::create(
         &rrd_path,
         // must be before the update timestamp or update will silently fail
-        Timestamp::from_timestamp(1737317206, 0).unwrap(),
+        time::UNIX_EPOCH + time::Duration::from_secs(1737317206),
         time::Duration::from_secs(1),
         true,
         None,
@@ -42,7 +42,7 @@ fn minimal_graph() -> anyhow::Result<()> {
     )?;
     assert!(rrd_path.exists());
 
-    let data_point_time = Timestamp::from_timestamp(1737317211, 0).unwrap();
+    let data_point_time = time::UNIX_EPOCH + time::Duration::from_secs(1737317211);
     update::update(
         &rrd_path,
         &[ds_name],
@@ -111,8 +111,8 @@ fn build_graph(
 ) -> RrdResult<Vec<u8>> {
     let var_name_g = elements::VarName::new("g".to_string())?;
     // a little before and a little after the data points in update()
-    let start = Timestamp::from_timestamp(1737316000, 0).unwrap();
-    let end = Timestamp::from_timestamp(1737319000, 0).unwrap();
+    let start = time::UNIX_EPOCH + time::Duration::from_secs(1737316000);
+    let end = time::UNIX_EPOCH + time::Duration::from_secs(1737319000);
 
     let (image, metadata) = graph::graph(
         img_format,

@@ -1,6 +1,6 @@
 //! Support for navigating fetched data sets.
 
-use crate::Timestamp;
+use crate::{Timestamp, TimestampExt};
 use rrd_sys::rrd_double;
 use std::{fmt, ops::Deref, time::Duration};
 
@@ -236,7 +236,7 @@ where
 
         f.debug_struct("Row")
             .field("ts", &self.timestamp)
-            .field("ts_int", &self.timestamp.timestamp())
+            .field("ts_int", &self.timestamp.as_time_t())
             .field(
                 "data",
                 &RowDataDebug {

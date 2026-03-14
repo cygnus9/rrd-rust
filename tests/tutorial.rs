@@ -5,7 +5,7 @@ use rrd::{
         graph::{elements, props},
         update,
     },
-    ConsolidationFn, Timestamp,
+    ConsolidationFn,
 };
 use std::time;
 
@@ -22,7 +22,7 @@ fn tutorial() -> anyhow::Result<()> {
 
     create::create(
         &rrd_path,
-        Timestamp::from_timestamp(920804400, 0).unwrap(),
+        time::UNIX_EPOCH + time::Duration::from_secs(920804400),
         time::Duration::from_secs(300),
         true,
         None,
@@ -40,7 +40,7 @@ fn tutorial() -> anyhow::Result<()> {
     )?;
 
     let update_data = [
-        (920804700_i64, 12345_u64),
+        (920804700_u64, 12345_u64),
         (920805000, 12357),
         (920805300, 12363),
         (920805600, 12363),
@@ -59,7 +59,7 @@ fn tutorial() -> anyhow::Result<()> {
     .into_iter()
     .map(|(ts, value)| {
         (
-            update::BatchTime::from(Timestamp::from_timestamp(ts, 0).unwrap()),
+            update::BatchTime::from(time::UNIX_EPOCH + time::Duration::from_secs(ts)),
             [update::Datum::from(value)],
         )
     })
@@ -73,8 +73,8 @@ fn tutorial() -> anyhow::Result<()> {
     let fetched = fetch::fetch(
         &rrd_path,
         ConsolidationFn::Avg,
-        Timestamp::from_timestamp(920804400, 0).unwrap(),
-        Timestamp::from_timestamp(920809200, 0).unwrap(),
+        time::UNIX_EPOCH + time::Duration::from_secs(920804400),
+        time::UNIX_EPOCH + time::Duration::from_secs(920809200),
         time::Duration::from_secs(300),
     )?;
 
@@ -103,7 +103,7 @@ fn tutorial() -> anyhow::Result<()> {
         (920809500, f64::NAN),
     ]
     .into_iter()
-    .map(|(ts, val)| (Timestamp::from_timestamp(ts, 0).unwrap(), val))
+    .map(|(ts, val)| (time::UNIX_EPOCH + time::Duration::from_secs(ts), val))
     .collect_vec();
 
     // timestamps match
@@ -135,8 +135,8 @@ fn tutorial() -> anyhow::Result<()> {
             );
         });
 
-    let graph_start = Timestamp::from_timestamp(920804400, 0).unwrap();
-    let graph_end = Timestamp::from_timestamp(920808000, 0).unwrap();
+    let graph_start = time::UNIX_EPOCH + time::Duration::from_secs(920804400);
+    let graph_end = time::UNIX_EPOCH + time::Duration::from_secs(920808000);
 
     let initial_expected_metadata = graph::GraphMetadata {
         graph_left: 51,
@@ -358,9 +358,9 @@ fn tutorial() -> anyhow::Result<()> {
                 ("legend[0]", "  Maximum allowed".into()),
                 ("legend[1]", "  Good speed".into()),
                 ("legend[2]", "  Too fast".into()),
-                ("coords[0]", "16,134,135,148".into()),
-                ("coords[1]", "231,134,315,148".into()),
-                ("coords[2]", "411,134,481,148".into()),
+                ("coords[0]", "16,133,135,148".into()),
+                ("coords[1]", "231,133,315,148".into()),
+                ("coords[2]", "411,133,481,148".into()),
             ]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
