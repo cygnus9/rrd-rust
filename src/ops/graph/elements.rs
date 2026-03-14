@@ -28,7 +28,7 @@ use crate::{
     ConsolidationFn, Timestamp, TimestampExt,
 };
 use itertools::Itertools;
-use std::{fmt::Write, path::PathBuf, sync};
+use std::{fmt::Write, path::PathBuf};
 
 /// Enum expressing all possible elements.
 ///
@@ -179,8 +179,11 @@ pub struct VarName {
     name: String,
 }
 
-static VALID_VNAME: sync::LazyLock<regex::Regex> =
-    sync::LazyLock::new(|| regex::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+fn is_valid_vname(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
 
 impl VarName {
     /// Create a new `VarName`, if the provided string is a valid name.
@@ -189,7 +192,7 @@ impl VarName {
     /// Returns `InvalidArgument` if the name is invalid (not matching `[A-Za-z0-9_-]+` or longer than 255 characters).
     pub fn new(name: impl Into<String>) -> Result<Self, InvalidArgument> {
         let s = name.into();
-        if s.len() <= 255 && VALID_VNAME.is_match(&s) {
+        if s.len() <= 255 && is_valid_vname(&s) {
             Ok(Self { name: s })
         } else {
             Err(InvalidArgument("Invalid var name"))
@@ -749,12 +752,12 @@ mod tests {
 
     #[test]
     fn vname_regex_valid() {
-        assert!(VALID_VNAME.is_match("foo_bar-baz-1"));
+        assert!(is_valid_vname("foo_bar-baz-1"));
     }
 
     #[test]
     fn vname_regex_invalid() {
-        assert!(!VALID_VNAME.is_match("foo@bar"));
+        assert!(!is_valid_vname("foo@bar"));
     }
 
     #[test]
