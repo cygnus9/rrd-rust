@@ -20,6 +20,12 @@ use std::{
 /// Fetch data from `filename` between `start` and `end`, consolidated with `cf`.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html>.
+///
+/// # Panics
+/// Panics if `resolution` is too large to fit in `c_ulong`.
+///
+/// # Errors
+/// Returns an error if the RRD file cannot be read or if the fetch operation fails.
 pub fn fetch(
     filename: &Path,
     cf: ConsolidationFn,
@@ -50,12 +56,12 @@ pub fn fetch(
         rrd_sys::rrd_fetch_r(
             filename.as_ptr(),
             cf.as_ptr(),
-            &mut start,
-            &mut end,
-            &mut resolution,
-            &mut ds_count,
-            &mut ds_names,
-            &mut data,
+            &raw mut start,
+            &raw mut end,
+            &raw mut resolution,
+            &raw mut ds_count,
+            &raw mut ds_names,
+            &raw mut data,
         )
     };
     return_code_to_result(rc)?;
@@ -79,11 +85,11 @@ pub fn fetch(
             .iter()
             .map(|p| {
                 let s = CStr::from_ptr(*p).to_string_lossy().into_owned();
-                rrd_sys::rrd_freemem(*p as *mut rrd_void);
+                rrd_sys::rrd_freemem((*p).cast::<rrd_void>());
                 s
             })
             .collect();
-        rrd_sys::rrd_freemem(ds_names as *mut rrd_void);
+        rrd_sys::rrd_freemem(ds_names.cast::<rrd_void>());
         names
     };
 

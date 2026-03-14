@@ -12,7 +12,7 @@ pub struct Data<T> {
     end: Timestamp,
     step: Duration,
     names: Vec<String>,
-    data: T,
+    values: T,
     row_count: usize,
 }
 
@@ -34,7 +34,7 @@ where
             end,
             step,
             names,
-            data,
+            values: data,
             row_count,
         }
     }
@@ -82,16 +82,19 @@ where
     T: Deref<Target = [rrd_double]>,
 {
     /// The number of rows.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.data.row_count()
     }
 
     /// True _iff_ there are 0 rows.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.data.row_count() == 0
     }
 
     /// Iterate over the rows.
+    #[must_use]
     pub fn iter(&self) -> RowsIter<'data, T> {
         RowsIter::new(self.data)
     }
@@ -107,6 +110,19 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         RowsIter::new(self.data)
+    }
+}
+
+impl<'data, T> IntoIterator for &Rows<'data, T>
+where
+    T: Deref<Target = [rrd_double]>,
+{
+    type Item = Row<'data, T>;
+
+    type IntoIter = RowsIter<'data, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -185,6 +201,7 @@ where
     }
 
     /// The timestamp for this row of data.
+    #[must_use]
     pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
@@ -192,8 +209,9 @@ where
     /// The values for this row, in the order of the data source names in the encompassing [`Data`].
     ///
     /// To access values and DS names together, see [`Self::iter_cells`].
+    #[must_use]
     pub fn as_slice(&self) -> &[f64] {
-        &self.data.data.as_ref()[self.data_offset..self.data_offset + self.data.names.len()]
+        &self.data.values.as_ref()[self.data_offset..self.data_offset + self.data.names.len()]
     }
 
     /// Iterate over the [`Cell`]s for this row's values.

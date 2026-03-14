@@ -19,18 +19,18 @@ fn main() {
         &[],
         &[
             create::DataSource::gauge(
-                create::DataSourceName::new("volt"),
+                &create::DataSourceName::new("volt"),
                 300,
                 Some(0.0),
                 Some(24000.0),
             ),
             create::DataSource::gauge(
-                create::DataSourceName::new("amps"),
+                &create::DataSourceName::new("amps"),
                 300,
                 Some(0.0),
                 Some(24000.0),
             ),
-            create::DataSource::compute(create::DataSourceName::new("watts"), "volt,amps,*"),
+            create::DataSource::compute(&create::DataSourceName::new("watts"), "volt,amps,*"),
         ],
         &[create::Archive::new(ConsolidationFn::Avg, 0.5, 1, 86400).unwrap()],
     )

@@ -33,7 +33,7 @@ fn minimal_graph() -> anyhow::Result<()> {
         None,
         &[],
         &[create::DataSource::gauge(
-            create::DataSourceName::new(ds_name),
+            &create::DataSourceName::new(ds_name),
             300,
             Some(0.0),
             Some(1000.0),
@@ -116,7 +116,7 @@ fn build_graph(
 
     let (image, metadata) = graph::graph(
         img_format,
-        props::GraphProps {
+        &props::GraphProps {
             time_range: props::TimeRange {
                 start: Some(start),
                 end: Some(end),

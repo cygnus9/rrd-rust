@@ -16,6 +16,8 @@
 
 #![deny(missing_docs)]
 
+use std::time;
+
 // TODO get confirmation from upstream about librrd thread safety
 pub mod data;
 pub mod error;
@@ -36,13 +38,17 @@ pub(crate) trait TimestampExt {
 
 impl TimestampExt for Timestamp {
     fn as_time_t(&self) -> rrd_sys::time_t {
-        self.duration_since(std::time::UNIX_EPOCH)
-            .expect("Timestamp must be after UNIX_EPOCH")
-            .as_secs() as rrd_sys::time_t
+        i64::try_from(
+            self.duration_since(std::time::UNIX_EPOCH)
+                .expect("Timestamp must be after UNIX_EPOCH")
+                .as_secs(),
+        )
+        .expect("timestamp too large")
     }
 
     fn from_time_t(time_t: rrd_sys::time_t) -> Self {
-        std::time::UNIX_EPOCH + std::time::Duration::from_secs(time_t as u64)
+        time::UNIX_EPOCH
+            + time::Duration::from_secs(u64::try_from(time_t).expect("negative timestamp"))
     }
 }
 

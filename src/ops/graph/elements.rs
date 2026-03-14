@@ -28,7 +28,7 @@ use crate::{
     ConsolidationFn, Timestamp, TimestampExt,
 };
 use itertools::Itertools;
-use std::{fmt::Write as _, path::PathBuf, sync};
+use std::{fmt::Write, path::PathBuf, sync};
 
 /// Enum expressing all possible elements.
 ///
@@ -183,7 +183,10 @@ static VALID_VNAME: sync::LazyLock<regex::Regex> =
     sync::LazyLock::new(|| regex::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
 
 impl VarName {
-    /// Create a new VarName, if the provided string is a valid name.
+    /// Create a new `VarName`, if the provided string is a valid name.
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if the name is invalid (not matching `[A-Za-z0-9_-]+` or longer than 255 characters).
     pub fn new(name: impl Into<String>) -> Result<Self, InvalidArgument> {
         let s = name.into();
         if s.len() <= 255 && VALID_VNAME.is_match(&s) {
@@ -224,7 +227,7 @@ pub struct Print {
 impl AppendArgs for Print {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         let fmt_mode = match &self.format_mode {
-            None => "".to_string(),
+            None => String::new(),
             Some(fm) => {
                 format!(
                     ":{}",
@@ -328,7 +331,7 @@ impl AppendArgs for VRule {
         }
         if let Some(d) = &self.dashes {
             d.append_to(&mut s);
-        };
+        }
         args.push(s);
         Ok(())
     }
@@ -357,10 +360,10 @@ impl Value {
             Value::Variable(v) => write!(s, "{}", v.name),
             Value::Timestamp(t) => write!(s, "{}", t.as_time_t()),
             Value::Constant(f) => {
-                write!(s, "{}", f)
+                write!(s, "{f}")
             }
         }
-        .unwrap()
+        .unwrap();
     }
 }
 
@@ -413,7 +416,7 @@ impl Dashes {
             .map(|o| format!(":dash-offset={o}"))
             .unwrap_or_default();
 
-        write!(s, "{prefix}{spacing_str}{offset_str}").unwrap()
+        write!(s, "{prefix}{spacing_str}{offset_str}").unwrap();
     }
 }
 
@@ -494,10 +497,10 @@ impl AppendArgs for Line {
             if self.color.is_none() {
                 s.push(':');
             }
-            s.push_str(":STACK")
+            s.push_str(":STACK");
         }
         if self.skip_scale {
-            s.push_str(":skipscale")
+            s.push_str(":skipscale");
         }
         if let Some(d) = &self.dashes {
             d.append_to(&mut s);
@@ -567,22 +570,17 @@ impl AppendArgs for Area {
 
         // If no color, docs imply `AREA:value::STACK` by saying it should be like LINE
         if self.stack {
-            if self
-                .color
-                .as_ref()
-                .map(|c| c.legend.is_none())
-                .unwrap_or(true)
-            {
+            if self.color.as_ref().is_none_or(|c| c.legend.is_none()) {
                 s.push(':');
             }
-            s.push_str(":STACK")
+            s.push_str(":STACK");
         }
         if self.skip_scale {
-            s.push_str(":skipscale")
+            s.push_str(":skipscale");
         }
 
         if let Some(gh) = grad_height {
-            write!(s, ":gradheight={gh}").unwrap()
+            write!(s, ":gradheight={gh}").unwrap();
         }
         args.push(s);
         Ok(())
@@ -683,7 +681,7 @@ impl Offset {
             Offset::Variable(v) => write!(s, "{}", v.name),
             Offset::TimeDelta(t) => write!(s, "{t}"),
         }
-        .unwrap()
+        .unwrap();
     }
 }
 
@@ -735,7 +733,7 @@ impl Legend {
     fn append_to(&self, s: &mut String) {
         // It's unclear from the docs -- does this need to be quoted, or is that only to deal with
         // shell command parsing?
-        write!(s, ":{}", self.0).unwrap()
+        write!(s, ":{}", self.0).unwrap();
     }
 }
 

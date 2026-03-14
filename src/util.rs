@@ -42,6 +42,9 @@ use std::{ffi::CString, fmt, path::Path, ptr};
 ///     assert!(path_to_str(path).is_err());
 /// }
 /// ```
+///
+/// # Errors
+/// Returns an error if the path contains invalid UTF-8.
 pub fn path_to_str(path: &Path) -> RrdResult<&str> {
     path.to_str().ok_or(RrdError::PathEncodingError)
 }

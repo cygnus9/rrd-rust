@@ -7,11 +7,18 @@ use crate::{
     ConsolidationFn, Timestamp, TimestampExt,
 };
 use log::debug;
+use std::convert;
 use std::{ffi::CString, path::Path, ptr::null, time::Duration};
 
 /// Create a new RRD.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdcreate.en.html>.
+///
+/// # Panics
+/// Panics if `step` is too large to fit in `c_ulong`.
+///
+/// # Errors
+/// Returns an error if the RRD file cannot be created or if any provided paths are invalid.
 #[allow(clippy::too_many_arguments)]
 pub fn create<'a>(
     filename: &Path,
@@ -25,7 +32,7 @@ pub fn create<'a>(
 ) -> RrdResult<()> {
     let sources = sources
         .iter()
-        .map(|p| path_to_str(p).and_then(|s| CString::new(s).map_err(|e| e.into())))
+        .map(|p| path_to_str(p).and_then(|s| CString::new(s).map_err(convert::Into::into)))
         .collect::<Result<NullTerminatedArrayOfStrings, _>>()?;
     let filename = CString::new(path_to_str(filename)?)?;
     let template = match template {
@@ -74,22 +81,27 @@ pub struct DataSource {
 
 impl DataSource {
     /// Define a 'GAUGE' data source.
-    pub fn gauge(name: DataSourceName, heartbeat: u32, min: Option<f64>, max: Option<f64>) -> Self {
+    #[must_use]
+    pub fn gauge(
+        name: &DataSourceName,
+        heartbeat: u32,
+        min: Option<f64>,
+        max: Option<f64>,
+    ) -> Self {
         Self {
             arg: format!(
                 "DS:{}:GAUGE:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define a 'COUNTER` data source.
+    /// Define a 'COUNTER' data source.
+    #[must_use]
     pub fn counter(
-        name: DataSourceName,
+        name: &DataSourceName,
         heartbeat: u32,
         min: Option<u64>,
         max: Option<u64>,
@@ -98,17 +110,16 @@ impl DataSource {
             arg: format!(
                 "DS:{}:COUNTER:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define a 'DCOUNTER` data source.
+    /// Define a 'DCOUNTER' data source.
+    #[must_use]
     pub fn dcounter(
-        name: DataSourceName,
+        name: &DataSourceName,
         heartbeat: u32,
         min: Option<f64>,
         max: Option<f64>,
@@ -117,17 +128,16 @@ impl DataSource {
             arg: format!(
                 "DS:{}:DCOUNTER:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define a 'DERIVE` data source.
+    /// Define a 'DERIVE' data source.
+    #[must_use]
     pub fn derive(
-        name: DataSourceName,
+        name: &DataSourceName,
         heartbeat: u32,
         min: Option<u64>,
         max: Option<u64>,
@@ -136,17 +146,16 @@ impl DataSource {
             arg: format!(
                 "DS:{}:DERIVE:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define a 'DDERIVE` data source.
+    /// Define a 'DDERIVE' data source.
+    #[must_use]
     pub fn dderive(
-        name: DataSourceName,
+        name: &DataSourceName,
         heartbeat: u32,
         min: Option<f64>,
         max: Option<f64>,
@@ -155,17 +164,16 @@ impl DataSource {
             arg: format!(
                 "DS:{}:DDERIVE:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define an 'ABSOLUTE` data source.
+    /// Define an 'ABSOLUTE' data source.
+    #[must_use]
     pub fn absolute(
-        name: DataSourceName,
+        name: &DataSourceName,
         heartbeat: u32,
         min: Option<u64>,
         max: Option<u64>,
@@ -174,16 +182,15 @@ impl DataSource {
             arg: format!(
                 "DS:{}:ABSOLUTE:{heartbeat}:{}:{}",
                 name.name,
-                min.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string()),
-                max.map(|m| m.to_string())
-                    .unwrap_or_else(|| "U".to_string())
+                min.map_or_else(|| "U".to_string(), |m| m.to_string()),
+                max.map_or_else(|| "U".to_string(), |m| m.to_string())
             ),
         }
     }
 
-    /// Define a 'COMPUTE` data source.
-    pub fn compute(name: DataSourceName, rpn: &str) -> Self {
+    /// Define a 'COMPUTE' data source.
+    #[must_use]
+    pub fn compute(name: &DataSourceName, rpn: &str) -> Self {
         Self {
             arg: format!("DS:{}:COMPUTE:{rpn}", name.name),
         }
@@ -208,6 +215,7 @@ impl DataSourceName {
     }
 
     /// A data source name that will be pre-filled from `src_ds_name`, optionally at source `index`.
+    #[must_use]
     pub fn mapped(name: &str, src_ds_name: &str, index: Option<u32>) -> Self {
         Self {
             name: match index {
@@ -231,6 +239,9 @@ impl Archive {
     /// `xfiles_factor` must be between 0 and 1.
     ///
     /// Returns `Some` if `xfiles_factor` is valid, `None` otherwise.
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if `xfiles_factor` is not in `[0, 1)`.
     pub fn new(
         consolidation_fn: ConsolidationFn,
         xfiles_factor: f64,

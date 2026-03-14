@@ -105,7 +105,7 @@ impl AppendArgs for Labels {
 
         if let Some(vl) = &self.vertical_label {
             args.push("--vertical-label".to_string());
-            args.push(vl.clone())
+            args.push(vl.clone());
         }
         Ok(())
     }
@@ -248,7 +248,7 @@ impl AppendArgs for XAxis {
 
         if let Some(wf) = &self.week_format {
             args.push("--week-fmt".to_string());
-            args.push(wf.clone())
+            args.push(wf.clone());
         }
 
         Ok(())
@@ -290,7 +290,7 @@ pub enum AxisGridTimeUnit {
 }
 
 impl AxisGridTimeUnit {
-    fn as_arg_str(&self) -> &'static str {
+    fn as_arg_str(self) -> &'static str {
         match self {
             AxisGridTimeUnit::Second => "SECOND",
             AxisGridTimeUnit::Minute => "MINUTE",
@@ -432,6 +432,9 @@ pub enum Units {
 
 impl UnitsExponent {
     /// `exp` must be a multiple of `3` in `[-18, 8]`.
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if `exp` is not a multiple of 3 in `[-18, 18]`.
     pub fn new(exp: i8) -> Result<Self, InvalidArgument> {
         if (-18..=18).contains(&exp) && exp % 3 == 0 {
             Ok(Self { exp })
@@ -552,7 +555,7 @@ pub enum LegendDirection {
 ///
 /// See [`GraphProps`]
 #[derive(Default, Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::struct_excessive_bools)]
 pub struct Misc {
     // Skipping `lazy` as it is inapplicable when generating an in-memory graph
     // Skipping daemon as we don't support daemons
@@ -601,7 +604,7 @@ impl AppendArgs for Misc {
 
         if let Some((on, off)) = self.grid_dash {
             args.push("--grid-dash".to_string());
-            args.push(format!("{}:{}", on, off));
+            args.push(format!("{on}:{off}"));
         }
 
         if let Some(border) = self.border {
@@ -632,7 +635,7 @@ impl AppendArgs for Misc {
             args.push(match &font_params.font {
                 None => format!("{tag}:{}", font_params.size),
                 Some(f) => format!("{tag}:{}:{f}", font_params.size),
-            })
+            });
         }
 
         if let Some(frm) = &self.font_render_mode {
@@ -711,6 +714,9 @@ pub struct Zoom {
 
 impl Zoom {
     /// Returns `Some` if zoom > 0.
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if `zoom` is not positive.
     pub fn new(zoom: f64) -> Result<Self, InvalidArgument> {
         if zoom > 0.0 {
             Ok(Self { zoom })

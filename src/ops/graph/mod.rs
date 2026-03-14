@@ -28,9 +28,15 @@ use std::{collections, ffi::CString, fmt::Write as _};
 /// graph.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html> or `/tests/tutorial.rs`.
+///
+/// # Panics
+/// Panics if the number of arguments is too large to fit in `c_int`.
+///
+/// # Errors
+/// Returns an error if the graph cannot be generated or if any provided data is invalid.
 pub fn graph(
     image_format: ImageFormat,
-    props: GraphProps,
+    props: &GraphProps,
     elements: &[GraphElement],
 ) -> RrdResult<(Vec<u8>, GraphMetadata)> {
     // Need to include initial "graphv" command since that's how `rrdtool` invokes rrd_graph_v.
@@ -48,7 +54,7 @@ pub fn graph(
         rrd_sys::rrd_graph_v(
             args.len().try_into().expect("Implausibly huge argc"),
             // different librrd versions differ in mutability of this pointer
-            args.as_ptr() as _,
+            args.as_ptr().cast(),
         )
     };
     if info_ptr.is_null() {
@@ -60,22 +66,22 @@ pub fn graph(
     let mut info = info::build_info_map(info_ptr);
 
     // pull out image first so debug output isn't massive
-    let image = extract_info_value(&mut info, "image", |v| v.into_blob())?;
+    let image = extract_info_value(&mut info, "image", info::InfoValue::into_blob)?;
 
     debug!("Graph output: {info:?}");
 
-    let graph_left = extract_info_value(&mut info, "graph_left", |v| v.into_count())?;
-    let graph_top = extract_info_value(&mut info, "graph_top", |v| v.into_count())?;
-    let graph_width = extract_info_value(&mut info, "graph_width", |v| v.into_count())?;
-    let graph_height = extract_info_value(&mut info, "graph_height", |v| v.into_count())?;
-    let image_width = extract_info_value(&mut info, "image_width", |v| v.into_count())?;
-    let image_height = extract_info_value(&mut info, "image_height", |v| v.into_count())?;
-    let graph_start = extract_info_value(&mut info, "graph_start", |v| v.into_count())
+    let graph_left = extract_info_value(&mut info, "graph_left", info::InfoValue::into_count)?;
+    let graph_top = extract_info_value(&mut info, "graph_top", info::InfoValue::into_count)?;
+    let graph_width = extract_info_value(&mut info, "graph_width", info::InfoValue::into_count)?;
+    let graph_height = extract_info_value(&mut info, "graph_height", info::InfoValue::into_count)?;
+    let image_width = extract_info_value(&mut info, "image_width", info::InfoValue::into_count)?;
+    let image_height = extract_info_value(&mut info, "image_height", info::InfoValue::into_count)?;
+    let graph_start = extract_info_value(&mut info, "graph_start", info::InfoValue::into_count)
         .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph start overflow")))?;
-    let graph_end = extract_info_value(&mut info, "graph_end", |v| v.into_count())
+    let graph_end = extract_info_value(&mut info, "graph_end", info::InfoValue::into_count)
         .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph end overflow")))?;
-    let value_min = extract_info_value(&mut info, "value_min", |v| v.into_value())?;
-    let value_max = extract_info_value(&mut info, "value_max", |v| v.into_value())?;
+    let value_min = extract_info_value(&mut info, "value_min", info::InfoValue::into_value)?;
+    let value_max = extract_info_value(&mut info, "value_max", info::InfoValue::into_value)?;
 
     Ok((
         image,
@@ -100,9 +106,12 @@ pub fn graph(
 /// Use this function to build command line or CGI template for a `RRD::GRAPH` tag.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdcgi.en.html>.
+///
+/// # Errors
+/// Returns an error if the graph arguments cannot be built or if the elements are invalid.
 pub fn graph_args(
     image_format: Option<ImageFormat>,
-    props: GraphProps,
+    props: &GraphProps,
     elements: &[GraphElement],
 ) -> RrdResult<Vec<String>> {
     // detect error conditions that will confusingly produce no librrd output whatsoever
@@ -201,7 +210,7 @@ pub struct Color {
 
 impl Color {
     /// Appends `#hex`.
-    fn append_to(&self, s: &mut String) {
+    fn append_to(self, s: &mut String) {
         match self.alpha {
             None => write!(s, "#{:02X}{:02X}{:02X}", self.red, self.green, self.blue,),
             Some(alpha) => write!(
@@ -210,7 +219,7 @@ impl Color {
                 self.red, self.green, self.blue, alpha
             ),
         }
-        .unwrap()
+        .unwrap();
     }
 }
 
@@ -246,7 +255,7 @@ impl std::str::FromStr for Color {
 trait AppendArgs {
     /// Append suitable args to the args buffer.
     ///
-    /// Returns Result to allow users to specify a PathBuf which may later fail conversion.
+    /// Returns Result to allow users to specify a `PathBuf` which may later fail conversion.
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()>;
 }
 
@@ -266,8 +275,8 @@ fn parse_hex_byte(input: &str) -> nom::IResult<&str, u8> {
     combinator::map_opt(
         sequence::pair(complete::anychar, complete::anychar),
         |(hi, lo)| {
-            let hi = hi.to_digit(16)? as u8;
-            let lo = lo.to_digit(16)? as u8;
+            let hi = u8::try_from(hi.to_digit(16)?).ok()?;
+            let lo = u8::try_from(lo.to_digit(16)?).ok()?;
 
             Some((hi << 4) | lo)
         },
@@ -331,7 +340,7 @@ mod tests {
         let rrd_path = std::path::PathBuf::from("data.rrd");
         let args = graph_args(
             Some(props::ImageFormat::Png),
-            props::GraphProps::default(),
+            &props::GraphProps::default(),
             &[
                 elements::Def {
                     var_name: var_name.clone(),

@@ -16,6 +16,9 @@ use std::{
 /// RRA.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdinfo.en.html>.
+///
+/// # Errors
+/// Returns an error if the RRD file cannot be read or if the info operation fails.
 pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
     let filename = CString::new(path_to_str(filename)?)?;
 
@@ -42,6 +45,7 @@ pub enum InfoValue {
 
 impl InfoValue {
     /// Returns `Some` if this is an `InfoValue::Value`, `None` otherwise
+    #[must_use]
     pub fn into_value(self) -> Option<f64> {
         match self {
             InfoValue::Value(v) => Some(v),
@@ -52,6 +56,7 @@ impl InfoValue {
     }
 
     /// Returns `Some` if this is an `InfoValue::Count`, `None` otherwise
+    #[must_use]
     pub fn into_count(self) -> Option<u64> {
         match self {
             InfoValue::Count(c) => Some(c),
@@ -62,6 +67,7 @@ impl InfoValue {
     }
 
     /// Returns `Some` if this is an `InfoValue::String`, `None` otherwise
+    #[must_use]
     pub fn into_string(self) -> Option<String> {
         match self {
             InfoValue::String(s) => Some(s),
@@ -72,6 +78,7 @@ impl InfoValue {
     }
 
     /// Returns `Some` if this is an `InfoValue::Int`, `None` otherwise
+    #[must_use]
     pub fn into_int(self) -> Option<i32> {
         match self {
             InfoValue::Int(i) => Some(i),
@@ -83,6 +90,7 @@ impl InfoValue {
     }
 
     /// Returns `Some` if this is an `InfoValue::Blob`, `None` otherwise
+    #[must_use]
     pub fn into_blob(self) -> Option<Vec<u8>> {
         match self {
             InfoValue::Blob(b) => Some(b),

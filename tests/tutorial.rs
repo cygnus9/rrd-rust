@@ -28,7 +28,7 @@ fn tutorial() -> anyhow::Result<()> {
         None,
         &[],
         &[create::DataSource::counter(
-            create::DataSourceName::new("speed"),
+            &create::DataSourceName::new("speed"),
             600,
             None,
             None,
@@ -157,7 +157,7 @@ fn tutorial() -> anyhow::Result<()> {
         let var_name: elements::VarName = "myspeed".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
-            props::GraphProps {
+            &props::GraphProps {
                 time_range: props::TimeRange {
                     start: Some(graph_start),
                     end: Some(graph_end),
@@ -208,7 +208,7 @@ fn tutorial() -> anyhow::Result<()> {
         let realspeed = "realspeed".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
-            props::GraphProps {
+            &props::GraphProps {
                 time_range: props::TimeRange {
                     start: Some(graph_start),
                     end: Some(graph_end),
@@ -264,7 +264,7 @@ fn tutorial() -> anyhow::Result<()> {
         let fast: elements::VarName = "fast".try_into()?;
         let (png_data, metadata) = graph::graph(
             props::ImageFormat::Png,
-            props::GraphProps {
+            &props::GraphProps {
                 time_range: props::TimeRange {
                     start: Some(graph_start),
                     end: Some(graph_end),

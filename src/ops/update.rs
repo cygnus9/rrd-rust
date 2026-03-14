@@ -45,6 +45,7 @@ pub struct Options {
 
 impl Options {
     /// Get the bitflags representation of these options.
+    #[must_use]
     pub fn bits(&self) -> rrd_int {
         let mut bits = 0;
         if self.skip_past_updates {
@@ -113,6 +114,12 @@ pub enum LockingMode {
 ///         &[(BatchTime::Now, &[1_u64.into(), 2_f64.into()])])
 /// }
 /// ```
+///
+/// # Panics
+/// Panics if the number of arguments is too large to fit in `rrd_int`.
+///
+/// # Errors
+/// Returns an error if the RRD file cannot be updated or if the data is invalid.
 pub fn update_all<'a, D, B, I, O>(filename: &Path, update_options: O, data: I) -> RrdResult<()>
 where
     D: AsRef<[Datum]> + 'a,
@@ -131,7 +138,7 @@ where
             filename.as_ptr(),
             null(),
             extra_flags,
-            args.len() as rrd_int,
+            rrd_int::try_from(args.len()).expect("too many args"),
             args.as_ptr(),
         )
     };
@@ -169,6 +176,12 @@ where
 ///         &[(BatchTime::Now, &[2_f64.into()])])
 /// }
 /// ```
+///
+/// # Panics
+/// Panics if the number of arguments is too large to fit in `rrd_int`.
+///
+/// # Errors
+/// Returns an error if the RRD file cannot be updated or if the data is invalid.
 pub fn update<'a, D, B, I>(
     filename: &Path,
     ds_names: &[&str],
@@ -193,7 +206,7 @@ where
             filename.as_ptr(),
             template.as_ptr(),
             extra_flags.bits(),
-            args.len() as rrd_int,
+            rrd_int::try_from(args.len()).expect("too many args"),
             args.as_ptr(),
         )
     };
@@ -278,15 +291,15 @@ where
                         timestamp_arg.push('U');
                     }
                     Datum::Int(i) => {
-                        write!(timestamp_arg, "{}", i).expect("Writing to a String can't fail");
+                        write!(timestamp_arg, "{i}").expect("Writing to a String can't fail");
                     }
                     Datum::Float(f) => {
-                        write!(timestamp_arg, "{}", f).expect("Writing to a String can't fail");
+                        write!(timestamp_arg, "{f}").expect("Writing to a String can't fail");
                     }
                 }
             }
 
-            CString::new(timestamp_arg).map_err(|e| e.into())
+            CString::new(timestamp_arg).map_err(std::convert::Into::into)
         })
         .collect::<Result<ArrayOfStrings, _>>()
 }
@@ -337,7 +350,7 @@ mod tests {
             None,
             &[],
             &[create::DataSource::counter(
-                create::DataSourceName::new("speed"),
+                &create::DataSourceName::new("speed"),
                 600,
                 None,
                 None,
