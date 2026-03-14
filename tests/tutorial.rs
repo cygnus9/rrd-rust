@@ -365,13 +365,88 @@ fn tutorial() -> anyhow::Result<()> {
             ..initial_expected_metadata
         };
 
-        // The coordinates of the legend text are not deterministic, so remove them before comparison
-        metadata.extra_info.remove("coords[0]");
-        metadata.extra_info.remove("coords[1]");
-        metadata.extra_info.remove("coords[2]");
+        assert!(Coords::from_str(
+            &metadata
+                .extra_info
+                .remove("coords[0]")
+                .expect("coords[0] is missing")
+                .into_string()
+                .expect("coords[0] is not a string")
+        )
+        .close_to(&Coords::from_str("16,134,135,148")));
+        assert!(Coords::from_str(
+            &metadata
+                .extra_info
+                .remove("coords[1]")
+                .expect("coords[1] is missing")
+                .into_string()
+                .expect("coords[1] is not a string")
+        )
+        .close_to(&Coords::from_str("231,134,315,148")));
+        assert!(Coords::from_str(
+            &metadata
+                .extra_info
+                .remove("coords[2]")
+                .expect("coords[2] is missing")
+                .into_string()
+                .expect("coords[2] is not a string")
+        )
+        .close_to(&Coords::from_str("411,134,481,148")));
 
         assert_eq!(expected, metadata);
     }
 
     Ok(())
+}
+
+struct Coord {
+    x: i32,
+    y: i32,
+}
+
+struct Coords {
+    top_left: Coord,
+    bottom_right: Coord,
+}
+
+impl Coords {
+    fn from_str(s: &str) -> Self {
+        let parts = s.split(',').collect_vec();
+        assert!(
+            parts.len() == 4,
+            "Expected 4 parts in coords string, got {}",
+            parts.len()
+        );
+
+        Coords {
+            top_left: Coord {
+                x: parts[0]
+                    .trim()
+                    .parse()
+                    .expect("Failed to parse x coordinate"),
+                y: parts[1]
+                    .trim()
+                    .parse()
+                    .expect("Failed to parse y coordinate"),
+            },
+            bottom_right: Coord {
+                x: parts[2]
+                    .trim()
+                    .parse()
+                    .expect("Failed to parse x coordinate"),
+                y: parts[3]
+                    .trim()
+                    .parse()
+                    .expect("Failed to parse y coordinate"),
+            },
+        }
+    }
+
+    fn close_to(&self, other: &Coords) -> bool {
+        let tolerance = 1;
+        (self.top_left.x - other.top_left.x).abs() <= tolerance
+            && (self.top_left.y - other.top_left.y).abs() <= tolerance
+            && (self.bottom_right.x - other.bottom_right.x).abs() <= tolerance
+            && (self.bottom_right.y - other.bottom_right.y).abs() <= tolerance
+    }
 }
