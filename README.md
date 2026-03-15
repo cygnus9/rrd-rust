@@ -34,7 +34,7 @@ Then add `rrd` as a dependency to your project.
 
 ```toml
 [dependencies]
-rrd = "0.1.0"
+rrd = "0.2.0"
 ```
 
 ### Windows
