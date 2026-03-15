@@ -751,12 +751,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn vname_regex_valid() {
+    fn vname_valid() {
         assert!(is_valid_vname("foo_bar-baz-1"));
     }
 
     #[test]
-    fn vname_regex_invalid() {
+    fn vname_invalid() {
         assert!(!is_valid_vname("foo@bar"));
     }
 
