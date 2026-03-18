@@ -33,7 +33,7 @@ jobs:
       image: fedora:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["41", "42", "43", "44"]
+        version: ["42", "43", "44", "45"]
     steps:
     - uses: actions/checkout@v3
     - name: Install dependencies
@@ -58,3 +58,35 @@ jobs:
       uses: ./.github/actions/quick-check
       with:
         locking_mode: 'true'
+  opensuse-tumbleweed:
+    runs-on: ubuntu-latest
+    container:
+      image: opensuse/tumbleweed:latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        zypper refresh
+        zypper install -y rrdtool-devel clang pkg-config
+    - name: Quick check
+      uses: ./.github/actions/quick-check
+      with:
+        locking_mode: 'true'
+  opensuse-leap:
+    runs-on: ubuntu-latest
+    container:
+      image: opensuse/leap:${{ matrix.version }}
+    strategy:
+      matrix:
+        version: ["15.6", "16.0"]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        zypper refresh
+        zypper install -y -t pattern devel_basis
+        zypper install -y rrdtool-devel clang
+    - name: Quick check
+      uses: ./.github/actions/quick-check
+      with:
+        locking_mode: ${{ matrix.version == '15.6' && 'false' || 'true' }}

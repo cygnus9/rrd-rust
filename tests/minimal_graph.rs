@@ -122,6 +122,12 @@ fn build_graph(
                 end: Some(end),
                 ..Default::default()
             },
+            size: props::Size {
+                width: Some(481),
+                height: Some(141),
+                only_graph: true,
+                ..Default::default()
+            },
             ..Default::default()
         },
         &[
@@ -150,10 +156,10 @@ fn build_graph(
 
     assert_eq!(
         graph::GraphMetadata {
-            graph_left: 51,
-            graph_top: 15,
-            graph_width: 400,
-            graph_height: 100,
+            graph_left: 0,
+            graph_top: 0,
+            graph_width: 481,
+            graph_height: 141,
             graph_start: start,
             graph_end: end,
             image_width: 481,
