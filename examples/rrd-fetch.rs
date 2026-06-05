@@ -24,13 +24,13 @@ fn main() {
         &[],
         &[
             create::DataSource::gauge(
-                &create::DataSourceName::new("sin"),
+                &create::DataSourceName::new("sin").unwrap(),
                 10,
                 Some(-1.0),
                 Some(1.0),
             ),
             create::DataSource::gauge(
-                &create::DataSourceName::new("cos"),
+                &create::DataSourceName::new("cos").unwrap(),
                 10,
                 Some(-1.0),
                 Some(1.0),

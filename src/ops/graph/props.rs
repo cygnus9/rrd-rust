@@ -72,11 +72,11 @@ impl AppendArgs for TimeRange {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         if let Some(s) = &self.start {
             args.push("--start".to_string());
-            args.push(format!("{}", s.as_time_t()));
+            args.push(format!("{}", s.try_as_time_t()?));
         }
         if let Some(e) = &self.end {
             args.push("--end".to_string());
-            args.push(format!("{}", e.as_time_t()));
+            args.push(format!("{}", e.try_as_time_t()?));
         }
         if let Some(ss) = &self.step_seconds {
             args.push("--step".to_string());
@@ -842,8 +842,8 @@ mod tests {
     fn everything_set() {
         let props = GraphProps {
             time_range: TimeRange {
-                start: Some(Timestamp::from_time_t(1_000)),
-                end: Some(Timestamp::from_time_t(100_000)),
+                start: Some(Timestamp::try_from_time_t(1_000).unwrap()),
+                end: Some(Timestamp::try_from_time_t(100_000).unwrap()),
                 step_seconds: Some(60),
             },
             labels: Labels {

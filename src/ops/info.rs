@@ -29,7 +29,7 @@ pub fn info(filename: &Path) -> RrdResult<HashMap<String, InfoValue>> {
         }));
     }
 
-    Ok(build_info_map(result_ptr))
+    build_info_map(result_ptr)
 }
 
 /// Value in the map returned from [`info()`], and other places that use the same info map.
@@ -134,12 +134,14 @@ impl From<Vec<u8>> for InfoValue {
 }
 
 /// Must only be called on a non-null pointer.
-///
-/// # Panics
-///
-/// Will panic if `info` is null.
-pub(crate) fn build_info_map(info: *mut rrd_sys::rrd_info_t) -> HashMap<String, InfoValue> {
-    assert!(!info.is_null());
+pub(crate) fn build_info_map(
+    info: *mut rrd_sys::rrd_info_t,
+) -> RrdResult<HashMap<String, InfoValue>> {
+    if info.is_null() {
+        return Err(RrdError::Internal(
+            "Cannot build info map from null pointer".to_string(),
+        ));
+    }
 
     let mut map = HashMap::new();
     let mut current = info;
@@ -164,16 +166,26 @@ pub(crate) fn build_info_map(info: *mut rrd_sys::rrd_info_t) -> HashMap<String, 
             rrd_sys::rrd_info_type_RD_I_BLO => {
                 let slice = unsafe {
                     let blob = (*current).value.u_blo;
-                    std::slice::from_raw_parts(
-                        blob.ptr.cast_const(),
-                        blob.size.try_into().expect("Implausibly huge blob"),
-                    )
+                    let size = match blob.size.try_into() {
+                        Ok(size) => size,
+                        Err(_) => {
+                            rrd_sys::rrd_info_free(info);
+                            return Err(RrdError::Internal(format!(
+                                "Info blob '{}' is too large",
+                                key
+                            )));
+                        }
+                    };
+                    std::slice::from_raw_parts(blob.ptr.cast_const(), size)
                 };
 
                 slice.to_vec().into()
             }
             t => {
-                panic!("Unexpected info type {t} - version mismatch, or memory corruption?")
+                unsafe { rrd_sys::rrd_info_free(info) }
+                return Err(RrdError::Internal(format!(
+                    "Unexpected info type {t} - version mismatch, or memory corruption?"
+                )));
             }
         };
 
@@ -184,5 +196,5 @@ pub(crate) fn build_info_map(info: *mut rrd_sys::rrd_info_t) -> HashMap<String, 
 
     unsafe { rrd_sys::rrd_info_free(info) }
 
-    map
+    Ok(map)
 }

@@ -29,9 +29,6 @@ use std::{collections, ffi::CString, fmt::Write as _};
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph.en.html> or `/tests/tutorial.rs`.
 ///
-/// # Panics
-/// Panics if the number of arguments is too large to fit in `c_int`.
-///
 /// # Errors
 /// Returns an error if the graph cannot be generated or if any provided data is invalid.
 pub fn graph(
@@ -50,9 +47,13 @@ pub fn graph(
         .map(CString::new)
         .collect::<Result<ArrayOfStrings, _>>()?;
 
+    let argc = args.len().try_into().map_err(|_| {
+        RrdError::InvalidArgument("too many graph arguments for librrd".to_string())
+    })?;
+
     let info_ptr = unsafe {
         rrd_sys::rrd_graph_v(
-            args.len().try_into().expect("Implausibly huge argc"),
+            argc,
             // different librrd versions differ in mutability of this pointer
             args.as_ptr().cast(),
         )
@@ -63,7 +64,7 @@ pub fn graph(
         }));
     }
 
-    let mut info = info::build_info_map(info_ptr);
+    let mut info = info::build_info_map(info_ptr)?;
 
     // pull out image first so debug output isn't massive
     let image = extract_info_value(&mut info, "image", info::InfoValue::into_blob)?;
@@ -76,10 +77,16 @@ pub fn graph(
     let graph_height = extract_info_value(&mut info, "graph_height", info::InfoValue::into_count)?;
     let image_width = extract_info_value(&mut info, "image_width", info::InfoValue::into_count)?;
     let image_height = extract_info_value(&mut info, "image_height", info::InfoValue::into_count)?;
-    let graph_start = extract_info_value(&mut info, "graph_start", info::InfoValue::into_count)
-        .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph start overflow")))?;
-    let graph_end = extract_info_value(&mut info, "graph_end", info::InfoValue::into_count)
-        .map(|t| Timestamp::from_time_t(t.try_into().expect("Graph end overflow")))?;
+    let graph_start = timestamp_from_count(extract_info_value(
+        &mut info,
+        "graph_start",
+        info::InfoValue::into_count,
+    )?)?;
+    let graph_end = timestamp_from_count(extract_info_value(
+        &mut info,
+        "graph_end",
+        info::InfoValue::into_count,
+    )?)?;
     let value_min = extract_info_value(&mut info, "value_min", info::InfoValue::into_value)?;
     let value_max = extract_info_value(&mut info, "value_max", info::InfoValue::into_value)?;
 
@@ -269,6 +276,13 @@ fn extract_info_value<T>(
         .ok_or_else(|| RrdError::Internal(format!("Graph info: no {key}")))?;
     transform(value)
         .ok_or_else(|| RrdError::Internal(format!("Graph info: unexpected {key} value type")))
+}
+
+fn timestamp_from_count(count: u64) -> RrdResult<Timestamp> {
+    let time_t = count
+        .try_into()
+        .map_err(|_| RrdError::Internal(format!("Graph timestamp {count} overflows time_t")))?;
+    Timestamp::try_from_time_t(time_t)
 }
 
 fn parse_hex_byte(input: &str) -> nom::IResult<&str, u8> {

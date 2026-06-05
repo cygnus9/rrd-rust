@@ -1,8 +1,7 @@
 //! Create new RRDs.
 
-use crate::error::InvalidArgument;
 use crate::{
-    error::{return_code_to_result, RrdResult},
+    error::{return_code_to_result, InvalidArgument, RrdError, RrdResult},
     util::{path_to_str, ArrayOfStrings, NullTerminatedArrayOfStrings},
     ConsolidationFn, Timestamp, TimestampExt,
 };
@@ -13,9 +12,6 @@ use std::{ffi::CString, path::Path, ptr::null, time::Duration};
 /// Create a new RRD.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdcreate.en.html>.
-///
-/// # Panics
-/// Panics if `step` is too large to fit in `c_ulong`.
 ///
 /// # Errors
 /// Returns an error if the RRD file cannot be created or if any provided paths are invalid.
@@ -47,25 +43,32 @@ pub fn create<'a>(
         .map(CString::new)
         .collect::<Result<ArrayOfStrings, _>>()?;
 
+    let start = start.try_as_time_t()?;
+
     debug!(
         "Create: file={filename:?} start={} step={} no_overwrite={no_overwrite} template={template:?} sources={sources:?} args={args:?}",
-        start.as_time_t(),
+        start,
         step.as_secs()
     );
+
+    #[allow(clippy::useless_conversion)]
+    let step = step
+        .as_secs()
+        .try_into()
+        .map_err(|_| RrdError::InvalidArgument("step is too large for librrd".to_string()))?;
+    let argc = args.len().try_into().map_err(|_| {
+        RrdError::InvalidArgument("too many create arguments for librrd".to_string())
+    })?;
 
     let rc = unsafe {
         rrd_sys::rrd_create_r2(
             filename.as_ptr(),
-            #[allow(clippy::useless_conversion)]
-            // windows c_ulong is u32
-            step.as_secs().try_into().expect("step too big for c_ulong"),
-            start.as_time_t(),
+            step,
+            start,
             no_overwrite.into(),
             sources.as_ptr(),
             template.map_or_else(null, |s| s.as_ptr()),
-            args.len()
-                .try_into()
-                .expect("Too many args to fit in rrd_int"),
+            argc,
             args.as_ptr(),
         )
     };
@@ -210,19 +213,55 @@ pub struct DataSourceName {
 
 impl DataSourceName {
     /// A data source name that does not reference a source RRD DS.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if the name is empty or contains `:`, which this wrapper uses
+    /// as an argument separator.
+    pub fn new(name: impl Into<String>) -> Result<Self, InvalidArgument> {
+        let name = name.into();
+        validate_ds_name(&name)?;
+        Ok(Self { name })
     }
 
     /// A data source name that will be pre-filled from `src_ds_name`, optionally at source `index`.
-    #[must_use]
-    pub fn mapped(name: &str, src_ds_name: &str, index: Option<u32>) -> Self {
-        Self {
+    ///
+    /// # Errors
+    /// Returns `InvalidArgument` if either DS name is empty or contains a character this wrapper
+    /// uses to compose mapping arguments.
+    pub fn mapped(
+        name: &str,
+        src_ds_name: &str,
+        index: Option<u32>,
+    ) -> Result<Self, InvalidArgument> {
+        validate_mapped_ds_name(name)?;
+        validate_mapped_ds_name(src_ds_name)?;
+        Ok(Self {
             name: match index {
                 None => format!("{name}={src_ds_name}"),
                 Some(i) => format!("{name}={src_ds_name}[{i}]"),
             },
-        }
+        })
+    }
+}
+
+fn validate_ds_name(name: &str) -> Result<(), InvalidArgument> {
+    if !name.is_empty() && !name.contains(':') {
+        Ok(())
+    } else {
+        Err(InvalidArgument(
+            "Data source name must be non-empty and not contain ':'",
+        ))
+    }
+}
+
+fn validate_mapped_ds_name(name: &str) -> Result<(), InvalidArgument> {
+    validate_ds_name(name)?;
+    if name.contains(['=', '[', ']']) {
+        Err(InvalidArgument(
+            "Mapped data source names must not contain '=', '[' or ']'",
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -272,5 +311,35 @@ impl Archive {
             self.steps,
             self.rows
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ds_name_valid() {
+        assert!(DataSourceName::new("foo_123").is_ok());
+        assert!(DataSourceName::new("a1234567890123456789").is_ok());
+        assert!(DataSourceName::new("foo-bar").is_ok());
+    }
+
+    #[test]
+    fn ds_name_invalid() {
+        assert!(DataSourceName::new("").is_err());
+        assert!(DataSourceName::new("foo:bar").is_err());
+    }
+
+    #[test]
+    fn mapped_ds_name_validates_parts() {
+        assert_eq!(
+            "dst=src[2]",
+            DataSourceName::mapped("dst", "src", Some(2)).unwrap().name
+        );
+        assert!(DataSourceName::mapped("dst-name", "src", None).is_ok());
+        assert!(DataSourceName::mapped("dst", "src-name", None).is_ok());
+        assert!(DataSourceName::mapped("dst=name", "src", None).is_err());
+        assert!(DataSourceName::mapped("dst[1]", "src", None).is_err());
     }
 }

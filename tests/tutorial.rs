@@ -28,7 +28,7 @@ fn tutorial() -> anyhow::Result<()> {
         None,
         &[],
         &[create::DataSource::counter(
-            &create::DataSourceName::new("speed"),
+            &create::DataSourceName::new("speed")?,
             600,
             None,
             None,

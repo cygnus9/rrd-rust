@@ -84,9 +84,6 @@ pub enum LockingMode {
 /// }
 /// ```
 ///
-/// # Panics
-/// Panics if the number of arguments is too large to fit in `rrd_int`.
-///
 /// # Errors
 /// Returns an error if the RRD file cannot be updated or if the data is invalid.
 pub fn update_all<'a, D, B, I, O>(filename: &Path, update_options: O, data: I) -> RrdResult<()>
@@ -102,14 +99,12 @@ where
 
     debug!("Update: file={filename:?} extra_flags=0x{extra_flags:02x} args={args:?}",);
 
+    let argc = rrd_int::try_from(args.len()).map_err(|_| {
+        RrdError::InvalidArgument("too many update arguments for librrd".to_string())
+    })?;
+
     let rc = unsafe {
-        rrd_sys::rrd_updatex_r(
-            filename.as_ptr(),
-            null(),
-            extra_flags,
-            rrd_int::try_from(args.len()).expect("too many args"),
-            args.as_ptr(),
-        )
+        rrd_sys::rrd_updatex_r(filename.as_ptr(), null(), extra_flags, argc, args.as_ptr())
     };
     return_code_to_result(rc)
 }
@@ -146,9 +141,6 @@ where
 /// }
 /// ```
 ///
-/// # Panics
-/// Panics if the number of arguments is too large to fit in `rrd_int`.
-///
 /// # Errors
 /// Returns an error if the RRD file cannot be updated or if the data is invalid.
 pub fn update<'a, D, B, I, O>(
@@ -172,12 +164,16 @@ where
         "Update: file={filename:?} template={template:?} extra_flags=0x{extra_flags:02x} args={args:?}",
     );
 
+    let argc = rrd_int::try_from(args.len()).map_err(|_| {
+        RrdError::InvalidArgument("too many update arguments for librrd".to_string())
+    })?;
+
     let rc = unsafe {
         rrd_sys::rrd_updatex_r(
             filename.as_ptr(),
             template.as_ptr(),
             extra_flags,
-            rrd_int::try_from(args.len()).expect("too many args"),
+            argc,
             args.as_ptr(),
         )
     };
@@ -250,7 +246,7 @@ where
                     timestamp_arg.push('N');
                 }
                 BatchTime::Timestamp(ts) => {
-                    write!(timestamp_arg, "{}", ts.as_time_t())
+                    write!(timestamp_arg, "{}", ts.try_as_time_t()?)
                         .expect("Writing to a String can't fail");
                 }
             }
@@ -291,7 +287,10 @@ mod tests {
 
         call_update_with_tuple_refs(
             &rrd_path,
-            &[(Timestamp::from_time_t(920804460).into(), [100_u64.into()])],
+            &[(
+                Timestamp::try_from_time_t(920804460)?.into(),
+                [100_u64.into()],
+            )],
         )?;
 
         Ok(())
@@ -306,7 +305,10 @@ mod tests {
 
         call_update_with_tuple_vals(
             &rrd_path,
-            [(Timestamp::from_time_t(920804460).into(), [100_u64.into()])],
+            [(
+                Timestamp::try_from_time_t(920804460)?.into(),
+                [100_u64.into()],
+            )],
         )?;
 
         Ok(())
@@ -315,13 +317,13 @@ mod tests {
     fn create(rrd_path: &Path) -> anyhow::Result<()> {
         create::create(
             rrd_path,
-            Timestamp::from_time_t(920804400),
+            Timestamp::try_from_time_t(920804400)?,
             time::Duration::from_secs(300),
             true,
             None,
             &[],
             &[create::DataSource::counter(
-                &create::DataSourceName::new("speed"),
+                &create::DataSourceName::new("speed")?,
                 600,
                 None,
                 None,

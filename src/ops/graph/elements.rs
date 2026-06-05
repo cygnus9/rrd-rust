@@ -100,13 +100,14 @@ impl AppendArgs for Def {
         );
 
         if let Some(step) = self.step {
+            validate_positive_u32(step, "DEF step must be positive")?;
             write!(s, ":step={step}").unwrap();
         }
         if let Some(start) = self.start {
-            write!(s, ":start={}", start.as_time_t()).unwrap();
+            write!(s, ":start={}", start.try_as_time_t()?).unwrap();
         }
         if let Some(end) = self.end {
-            write!(s, ":end={}", end.as_time_t()).unwrap();
+            write!(s, ":end={}", end.try_as_time_t()?).unwrap();
         }
         if let Some(reduce) = self.reduce {
             write!(s, ":reduce={}", reduce.as_arg_str()).unwrap();
@@ -301,7 +302,7 @@ pub struct Comment {
 
 impl AppendArgs for Comment {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
-        args.push(format!("COMMENT:{}", self.text));
+        args.push(format!("COMMENT:{}", escape_graph_text(&self.text)));
         Ok(())
     }
 }
@@ -327,13 +328,13 @@ pub struct VRule {
 impl AppendArgs for VRule {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         let mut s = "VRULE:".to_string();
-        self.value.append_to(&mut s);
+        self.value.append_to(&mut s)?;
         self.color.append_to(&mut s);
         if let Some(l) = &self.legend {
             l.append_to(&mut s);
         }
         if let Some(d) = &self.dashes {
-            d.append_to(&mut s);
+            d.append_to(&mut s)?;
         }
         args.push(s);
         Ok(())
@@ -358,15 +359,17 @@ pub enum Value {
 }
 
 impl Value {
-    fn append_to(&self, s: &mut String) {
+    fn append_to(&self, s: &mut String) -> RrdResult<()> {
         match self {
             Value::Variable(v) => write!(s, "{}", v.name),
-            Value::Timestamp(t) => write!(s, "{}", t.as_time_t()),
+            Value::Timestamp(t) => write!(s, "{}", t.try_as_time_t()?),
             Value::Constant(f) => {
+                validate_finite(*f, "Graph value must be finite")?;
                 write!(s, "{f}")
             }
         }
         .unwrap();
+        Ok(())
     }
 }
 
@@ -400,18 +403,30 @@ pub struct Dashes {
 
 impl Dashes {
     /// Returns `:dashes...`
-    fn append_to(&self, s: &mut String) {
+    fn append_to(&self, s: &mut String) -> RrdResult<()> {
         let prefix = ":dashes";
         let spacing_str = match &self.spacing {
             None => String::new(),
             Some(spacing) => match spacing {
-                DashSpacing::Simple(num) => format!("={num}"),
-                DashSpacing::Custom(nums) => format!(
-                    "={}",
-                    nums.iter()
-                        .flat_map(|(on, off)| [on, off].into_iter())
-                        .join(",")
-                ),
+                DashSpacing::Simple(num) => {
+                    validate_positive_u32(*num, "Dash spacing must be positive")?;
+                    format!("={num}")
+                }
+                DashSpacing::Custom(nums) => {
+                    if nums.is_empty() {
+                        return Err(InvalidArgument("Custom dash spacing must not be empty").into());
+                    }
+                    for (on, off) in nums {
+                        validate_positive_u32(*on, "Dash spacing must be positive")?;
+                        validate_positive_u32(*off, "Dash spacing must be positive")?;
+                    }
+                    format!(
+                        "={}",
+                        nums.iter()
+                            .flat_map(|(on, off)| [on, off].into_iter())
+                            .join(",")
+                    )
+                }
             },
         };
         let offset_str = self
@@ -420,6 +435,7 @@ impl Dashes {
             .unwrap_or_default();
 
         write!(s, "{prefix}{spacing_str}{offset_str}").unwrap();
+        Ok(())
     }
 }
 
@@ -451,13 +467,13 @@ pub struct HRule {
 impl AppendArgs for HRule {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         let mut s = "HRULE:".to_string();
-        self.value.append_to(&mut s);
+        self.value.append_to(&mut s)?;
         self.color.append_to(&mut s);
         if let Some(l) = &self.legend {
             l.append_to(&mut s);
         }
         if let Some(d) = &self.dashes {
-            d.append_to(&mut s);
+            d.append_to(&mut s)?;
         }
         args.push(s);
         Ok(())
@@ -486,6 +502,7 @@ pub struct Line {
 
 impl AppendArgs for Line {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
+        validate_non_negative_finite(self.width, "Line width must be non-negative and finite")?;
         let mut s = format!("LINE{}:{}", self.width, self.value.name);
 
         if let Some(cwl) = &self.color {
@@ -506,7 +523,7 @@ impl AppendArgs for Line {
             s.push_str(":skipscale");
         }
         if let Some(d) = &self.dashes {
-            d.append_to(&mut s);
+            d.append_to(&mut s)?;
         }
         args.push(s);
         Ok(())
@@ -583,6 +600,7 @@ impl AppendArgs for Area {
         }
 
         if let Some(gh) = grad_height {
+            validate_positive_finite(gh, "Area gradient height must be positive and finite")?;
             write!(s, ":gradheight={gh}").unwrap();
         }
         args.push(s);
@@ -627,6 +645,7 @@ impl AppendArgs for Tick {
         let mut s = format!("TICK:{}", self.var_name.name);
         self.color.append_to(&mut s);
         if let Some(f) = self.fraction {
+            validate_finite(f, "Tick fraction must be finite")?;
             write!(s, ":{f}").unwrap();
         }
         if let Some(l) = &self.legend {
@@ -656,7 +675,7 @@ pub struct Shift {
 impl AppendArgs for Shift {
     fn append_to(&self, args: &mut Vec<String>) -> RrdResult<()> {
         let mut s = format!("SHIFT:{}:", self.var_name.name,);
-        self.offset.append_to(&mut s);
+        self.offset.append_to(&mut s)?;
         args.push(s);
         Ok(())
     }
@@ -679,12 +698,16 @@ pub enum Offset {
 }
 
 impl Offset {
-    fn append_to(&self, s: &mut String) {
+    fn append_to(&self, s: &mut String) -> RrdResult<()> {
         match self {
             Offset::Variable(v) => write!(s, "{}", v.name),
-            Offset::TimeDelta(t) => write!(s, "{t}"),
+            Offset::TimeDelta(t) => {
+                validate_finite(*t, "Shift offset must be finite")?;
+                write!(s, "{t}")
+            }
         }
         .unwrap();
+        Ok(())
     }
 }
 
@@ -721,28 +744,76 @@ impl From<TextAlign> for GraphElement {
     }
 }
 
-// TODO escape colons for the user
 /// Text to include in the legend for the containing element.
 ///
-/// Colons (`:`) must be escaped as `\:`, which in a string literal needs the backslash escaped
-/// as well, so it would be typed `"\\:"`.
+/// Colons (`:`) and backslashes (`\`) are escaped automatically when graph arguments are built.
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Legend(String);
 
 impl Legend {
+    /// Create a new legend from raw text.
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self(text.into())
+    }
+
     /// Appends `:` followed by quote-wrapped legend text.
     fn append_to(&self, s: &mut String) {
         // It's unclear from the docs -- does this need to be quoted, or is that only to deal with
         // shell command parsing?
-        write!(s, ":{}", self.0).unwrap();
+        write!(s, ":{}", escape_graph_text(&self.0)).unwrap();
     }
 }
 
 impl<S: Into<String>> From<S> for Legend {
     fn from(value: S) -> Self {
-        Self(value.into())
+        Self::new(value)
+    }
+}
+
+fn escape_graph_text(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '\\' => escaped.push_str("\\\\"),
+            ':' => escaped.push_str("\\:"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
+fn validate_finite(value: f64, message: &'static str) -> RrdResult<()> {
+    if value.is_finite() {
+        Ok(())
+    } else {
+        Err(InvalidArgument(message).into())
+    }
+}
+
+fn validate_positive_finite(value: f64, message: &'static str) -> RrdResult<()> {
+    if value.is_finite() && value > 0.0 {
+        Ok(())
+    } else {
+        Err(InvalidArgument(message).into())
+    }
+}
+
+fn validate_non_negative_finite(value: f64, message: &'static str) -> RrdResult<()> {
+    if value.is_finite() && value >= 0.0 {
+        Ok(())
+    } else {
+        Err(InvalidArgument(message).into())
+    }
+}
+
+fn validate_positive_u32(value: u32, message: &'static str) -> RrdResult<()> {
+    if value > 0 {
+        Ok(())
+    } else {
+        Err(InvalidArgument(message).into())
     }
 }
 
@@ -769,8 +840,8 @@ mod tests {
             ds_name: "DS1".to_string(),
             consolidation_fn: ConsolidationFn::Avg,
             step: Some(1),
-            start: Some(Timestamp::from_time_t(100)),
-            end: Some(Timestamp::from_time_t(1000)),
+            start: Some(Timestamp::try_from_time_t(100).unwrap()),
+            end: Some(Timestamp::try_from_time_t(1000).unwrap()),
             reduce: Some(ConsolidationFn::Max),
         }
         .append_to(&mut args)
@@ -781,6 +852,24 @@ mod tests {
             expected.into_iter().map(|s| s.to_string()).collect_vec(),
             args
         );
+    }
+    #[test]
+    fn def_rejects_zero_step() {
+        let mut args = vec![];
+        let result = Def {
+            var_name: VarName::new("var".to_string()).unwrap(),
+            rrd: "data.rrd".into(),
+            ds_name: "DS1".to_string(),
+            consolidation_fn: ConsolidationFn::Avg,
+            step: Some(0),
+            start: None,
+            end: None,
+            reduce: None,
+        }
+        .append_to(&mut args);
+
+        assert!(result.is_err());
+        assert!(args.is_empty());
     }
     #[test]
     fn vdef() {
@@ -863,6 +952,21 @@ mod tests {
         );
     }
     #[test]
+    fn comment_escapes_graph_text() {
+        let mut args = vec![];
+        Comment {
+            text: r"path\to:thing".into(),
+        }
+        .append_to(&mut args)
+        .unwrap();
+
+        let expected = [r"COMMENT:path\\to\:thing"];
+        assert_eq!(
+            expected.into_iter().map(|s| s.to_string()).collect_vec(),
+            args
+        );
+    }
+    #[test]
     fn vrule() {
         let mut args = vec![];
         VRule {
@@ -884,10 +988,42 @@ mod tests {
         );
     }
     #[test]
+    fn legend_escapes_graph_text() {
+        let mut args = vec![];
+        VRule {
+            value: Value::Variable(VarName::new("var").unwrap()),
+            color: "#01020304".parse().unwrap(),
+            legend: Some(Legend::new(r"path\to:thing")),
+            dashes: None,
+        }
+        .append_to(&mut args)
+        .unwrap();
+
+        let expected = [r"VRULE:var#01020304:path\\to\:thing"];
+        assert_eq!(
+            expected.into_iter().map(|s| s.to_string()).collect_vec(),
+            args
+        );
+    }
+    #[test]
+    fn value_rejects_non_finite_constants() {
+        let mut args = vec![];
+        let result = HRule {
+            value: Value::Constant(f64::NAN),
+            color: "#010203".parse().unwrap(),
+            legend: None,
+            dashes: None,
+        }
+        .append_to(&mut args);
+
+        assert!(result.is_err());
+        assert!(args.is_empty());
+    }
+    #[test]
     fn hrule() {
         let mut args = vec![];
         HRule {
-            value: Value::Timestamp(Timestamp::from_time_t(1000)),
+            value: Value::Timestamp(Timestamp::try_from_time_t(1000).unwrap()),
             color: "#010203".parse().unwrap(),
             legend: None,
             dashes: Some(Dashes {
@@ -903,6 +1039,29 @@ mod tests {
             expected.into_iter().map(|s| s.to_string()).collect_vec(),
             args
         );
+    }
+    #[test]
+    fn dashes_reject_invalid_spacing() {
+        for spacing in [
+            DashSpacing::Simple(0),
+            DashSpacing::Custom(vec![]),
+            DashSpacing::Custom(vec![(1, 0)]),
+        ] {
+            let mut args = vec![];
+            let result = VRule {
+                value: Value::Variable(VarName::new("var").unwrap()),
+                color: "#01020304".parse().unwrap(),
+                legend: None,
+                dashes: Some(Dashes {
+                    spacing: Some(spacing),
+                    offset: None,
+                }),
+            }
+            .append_to(&mut args);
+
+            assert!(result.is_err());
+            assert!(args.is_empty());
+        }
     }
     #[test]
     fn line() {
@@ -926,6 +1085,44 @@ mod tests {
             expected.into_iter().map(|s| s.to_string()).collect_vec(),
             args
         );
+    }
+    #[test]
+    fn line_allows_zero_width() {
+        let mut args = vec![];
+        Line {
+            width: 0.0,
+            value: VarName::new("var").unwrap(),
+            color: None,
+            stack: false,
+            skip_scale: false,
+            dashes: None,
+        }
+        .append_to(&mut args)
+        .unwrap();
+
+        let expected = ["LINE0:var"];
+        assert_eq!(
+            expected.into_iter().map(|s| s.to_string()).collect_vec(),
+            args
+        );
+    }
+    #[test]
+    fn line_rejects_invalid_width() {
+        for width in [-1.0, f64::INFINITY, f64::NAN] {
+            let mut args = vec![];
+            let result = Line {
+                width,
+                value: VarName::new("var").unwrap(),
+                color: None,
+                stack: false,
+                skip_scale: false,
+                dashes: None,
+            }
+            .append_to(&mut args);
+
+            assert!(result.is_err());
+            assert!(args.is_empty());
+        }
     }
     #[test]
     fn area() {
@@ -953,6 +1150,29 @@ mod tests {
         );
     }
     #[test]
+    fn area_rejects_invalid_gradient_height() {
+        for gradient_height in [0.0, -1.0, f64::INFINITY, f64::NAN] {
+            let mut args = vec![];
+            let result = Area {
+                value: VarName::new("var").unwrap(),
+                color: Some(ColorWithLegend {
+                    color: AreaColor::Gradient {
+                        color1: "#01020304".parse().unwrap(),
+                        color2: "#41424344".parse().unwrap(),
+                        gradient_height: Some(gradient_height),
+                    },
+                    legend: None,
+                }),
+                stack: false,
+                skip_scale: false,
+            }
+            .append_to(&mut args);
+
+            assert!(result.is_err());
+            assert!(args.is_empty());
+        }
+    }
+    #[test]
     fn tick() {
         let mut args = vec![];
         Tick {
@@ -971,6 +1191,40 @@ mod tests {
         );
     }
     #[test]
+    fn tick_allows_negative_fraction() {
+        let mut args = vec![];
+        Tick {
+            var_name: VarName::new("var").unwrap(),
+            color: "#01020304".parse().unwrap(),
+            fraction: Some(-0.5),
+            legend: None,
+        }
+        .append_to(&mut args)
+        .unwrap();
+
+        let expected = ["TICK:var#01020304:-0.5"];
+        assert_eq!(
+            expected.into_iter().map(|s| s.to_string()).collect_vec(),
+            args
+        );
+    }
+    #[test]
+    fn tick_rejects_invalid_fraction() {
+        for fraction in [f64::INFINITY, f64::NAN] {
+            let mut args = vec![];
+            let result = Tick {
+                var_name: VarName::new("var").unwrap(),
+                color: "#01020304".parse().unwrap(),
+                fraction: Some(fraction),
+                legend: None,
+            }
+            .append_to(&mut args);
+
+            assert!(result.is_err());
+            assert!(args.is_empty());
+        }
+    }
+    #[test]
     fn shift() {
         let mut args = vec![];
         Shift {
@@ -985,6 +1239,20 @@ mod tests {
             expected.into_iter().map(|s| s.to_string()).collect_vec(),
             args
         );
+    }
+    #[test]
+    fn shift_rejects_non_finite_time_delta() {
+        for offset in [f64::INFINITY, f64::NAN] {
+            let mut args = vec![];
+            let result = Shift {
+                var_name: VarName::new("var").unwrap(),
+                offset: Offset::TimeDelta(offset),
+            }
+            .append_to(&mut args);
+
+            assert!(result.is_err());
+            assert!(args.is_empty());
+        }
     }
     #[test]
     fn textalign() {

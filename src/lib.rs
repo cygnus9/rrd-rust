@@ -16,6 +16,7 @@
 
 #![deny(missing_docs)]
 
+use crate::error::{RrdError, RrdResult};
 use std::time;
 
 // TODO get confirmation from upstream about librrd thread safety
@@ -30,25 +31,28 @@ pub type Timestamp = std::time::SystemTime;
 /// Internal extensions for [`Timestamp`]
 pub(crate) trait TimestampExt {
     /// Returns the timestamp as seconds since epoch.
-    fn as_time_t(&self) -> rrd_sys::time_t;
+    fn try_as_time_t(&self) -> RrdResult<rrd_sys::time_t>;
 
     /// Creates a timestamp from seconds since epoch.
-    fn from_time_t(time_t: rrd_sys::time_t) -> Self;
+    fn try_from_time_t(time_t: rrd_sys::time_t) -> RrdResult<Self>
+    where
+        Self: Sized;
 }
 
 impl TimestampExt for Timestamp {
-    fn as_time_t(&self) -> rrd_sys::time_t {
-        i64::try_from(
-            self.duration_since(std::time::UNIX_EPOCH)
-                .expect("Timestamp must be after UNIX_EPOCH")
-                .as_secs(),
-        )
-        .expect("timestamp too large")
+    fn try_as_time_t(&self) -> RrdResult<rrd_sys::time_t> {
+        let duration = self.duration_since(std::time::UNIX_EPOCH).map_err(|_| {
+            RrdError::InvalidArgument("timestamp must be after UNIX_EPOCH".to_string())
+        })?;
+        i64::try_from(duration.as_secs())
+            .map_err(|_| RrdError::InvalidArgument("timestamp is too large for librrd".to_string()))
     }
 
-    fn from_time_t(time_t: rrd_sys::time_t) -> Self {
-        time::UNIX_EPOCH
-            + time::Duration::from_secs(u64::try_from(time_t).expect("negative timestamp"))
+    fn try_from_time_t(time_t: rrd_sys::time_t) -> RrdResult<Self> {
+        let secs = u64::try_from(time_t).map_err(|_| {
+            RrdError::Internal(format!("librrd returned negative timestamp {time_t}"))
+        })?;
+        Ok(time::UNIX_EPOCH + time::Duration::from_secs(secs))
     }
 }
 
@@ -72,5 +76,32 @@ impl ConsolidationFn {
             ConsolidationFn::Max => "MAX",
             ConsolidationFn::Last => "LAST",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_before_epoch_is_invalid_argument() {
+        let timestamp = time::UNIX_EPOCH - time::Duration::from_secs(1);
+
+        assert_eq!(
+            Err(RrdError::InvalidArgument(
+                "timestamp must be after UNIX_EPOCH".to_string()
+            )),
+            timestamp.try_as_time_t()
+        );
+    }
+
+    #[test]
+    fn negative_time_t_is_internal_error() {
+        assert_eq!(
+            Err(RrdError::Internal(
+                "librrd returned negative timestamp -1".to_string()
+            )),
+            Timestamp::try_from_time_t(-1)
+        );
     }
 }

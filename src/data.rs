@@ -174,7 +174,8 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.max_index, Some(self.max_index))
+        let remaining = self.max_index - self.next_index;
+        (remaining, Some(remaining))
     }
 }
 
@@ -254,7 +255,7 @@ where
 
         f.debug_struct("Row")
             .field("ts", &self.timestamp)
-            .field("ts_int", &self.timestamp.as_time_t())
+            .field("ts_int", &self.timestamp.try_as_time_t())
             .field(
                 "data",
                 &RowDataDebug {
@@ -272,4 +273,34 @@ pub struct Cell<'data> {
     pub name: &'data str,
     /// A value in a [`Row`]
     pub value: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::UNIX_EPOCH;
+
+    #[test]
+    fn rows_iter_size_hint_reports_remaining_rows() {
+        let data = Data::new(
+            UNIX_EPOCH,
+            UNIX_EPOCH + Duration::from_secs(2),
+            Duration::from_secs(1),
+            vec!["a".to_string(), "b".to_string()],
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        );
+        let mut rows = data.rows().iter();
+
+        assert_eq!((3, Some(3)), rows.size_hint());
+        assert_eq!(3, rows.len());
+
+        assert!(rows.next().is_some());
+        assert_eq!((2, Some(2)), rows.size_hint());
+        assert_eq!(2, rows.len());
+
+        assert!(rows.next().is_some());
+        assert!(rows.next().is_some());
+        assert_eq!((0, Some(0)), rows.size_hint());
+        assert_eq!(0, rows.len());
+    }
 }

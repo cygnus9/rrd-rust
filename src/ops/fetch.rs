@@ -2,7 +2,7 @@
 
 use crate::{
     data::Data,
-    error::{return_code_to_result, RrdResult},
+    error::{return_code_to_result, RrdError, RrdResult},
     util::path_to_str,
     ConsolidationFn, Timestamp, TimestampExt,
 };
@@ -21,9 +21,6 @@ use std::{
 ///
 /// See <https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html>.
 ///
-/// # Panics
-/// Panics if `resolution` is too large to fit in `c_ulong`.
-///
 /// # Errors
 /// Returns an error if the RRD file cannot be read or if the fetch operation fails.
 pub fn fetch(
@@ -38,14 +35,13 @@ pub fn fetch(
     let cf = CString::new(cf.as_arg_str())?;
 
     // in/out - clobber var names to avoid accidentally using original input values
-    let mut start = start.as_time_t();
-    let mut end = end.as_time_t();
-    // windows c_ulong is u32
+    let mut start = start.try_as_time_t()?;
+    let mut end = end.try_as_time_t()?;
     #[allow(clippy::useless_conversion)]
     let mut resolution = resolution
         .as_secs()
         .try_into()
-        .expect("Implausibly long resolution");
+        .map_err(|_| RrdError::InvalidArgument("resolution is too large for librrd".to_string()))?;
 
     // out
     let mut ds_count = 0;
@@ -66,19 +62,38 @@ pub fn fetch(
     };
     return_code_to_result(rc)?;
 
-    assert!(!ds_names.is_null());
-    assert!(!data.is_null());
-    assert!(resolution > 0);
+    if ds_names.is_null() {
+        return Err(RrdError::Internal(
+            "librrd fetch returned null data source names".to_string(),
+        ));
+    }
+    if data.is_null() {
+        return Err(RrdError::Internal(
+            "librrd fetch returned null data".to_string(),
+        ));
+    }
+    if resolution == 0 {
+        return Err(RrdError::Internal(
+            "librrd fetch returned zero resolution".to_string(),
+        ));
+    }
 
     // Move forward one step -- first timestamp's data is included in the time that ends one step ahead
-    let start = Timestamp::from_time_t(
-        start
-            .checked_add(i64::try_from(resolution).expect("Resolution i64 overflow"))
-            .expect("Start overflow"),
-    );
-    let end = Timestamp::from_time_t(end);
+    let resolution_i64 = i64::try_from(resolution).map_err(|_| {
+        RrdError::Internal(format!(
+            "librrd fetch returned resolution {resolution} that overflows i64"
+        ))
+    })?;
+    let start_time_t = start
+        .checked_add(resolution_i64)
+        .ok_or_else(|| RrdError::Internal("Fetch start timestamp overflow".to_string()))?;
+    let end_time_t = end;
+    let start = Timestamp::try_from_time_t(start_time_t)?;
+    let end = Timestamp::try_from_time_t(end_time_t)?;
 
-    let ds_count_usize = ds_count.try_into().expect("Count overflow");
+    let ds_count_usize = ds_count.try_into().map_err(|_| {
+        RrdError::Internal(format!("librrd fetch returned invalid DS count {ds_count}"))
+    })?;
 
     let names = unsafe {
         let names: Vec<_> = slice::from_raw_parts(ds_names, ds_count_usize)
@@ -93,26 +108,29 @@ pub fn fetch(
         names
     };
 
-    let rows = (usize::try_from(
-        end.as_time_t()
-            .checked_sub(start.as_time_t())
-            .expect("Negative time range"),
-    )
-    .expect("Time range overflow")
-        / usize::try_from(resolution).expect("Resolution usize overflow"))
-    .checked_add(1)
-    .expect("Num rows overflow");
+    let time_range = end_time_t
+        .checked_sub(start_time_t)
+        .ok_or_else(|| RrdError::Internal("Negative fetch time range".to_string()))?;
+    let time_range = usize::try_from(time_range)
+        .map_err(|_| RrdError::Internal("Fetch time range overflow".to_string()))?;
+    let resolution = usize::try_from(resolution)
+        .map_err(|_| RrdError::Internal("Fetch resolution overflow".to_string()))?;
+    let rows = (time_range / resolution)
+        .checked_add(1)
+        .ok_or_else(|| RrdError::Internal("Fetch row count overflow".to_string()))?;
     let data = Array {
         ptr: data,
-        len: rows.checked_mul(ds_count_usize).expect("Data len overflow"),
+        len: rows
+            .checked_mul(ds_count_usize)
+            .ok_or_else(|| RrdError::Internal("Fetch data length overflow".to_string()))?,
     };
 
-    // we need u64, but windows c_ulong is u32
-    #[allow(clippy::useless_conversion)]
+    let resolution = u64::try_from(resolution)
+        .map_err(|_| RrdError::Internal("Fetch resolution overflow".to_string()))?;
     Ok(Data::new(
         start,
         end,
-        Duration::from_secs(resolution.into()),
+        Duration::from_secs(resolution),
         names,
         data,
     ))

@@ -13,7 +13,7 @@ fn main() {
         None,
         &[],
         &[create::DataSource::gauge(
-            &create::DataSourceName::new("watts"),
+            &create::DataSourceName::new("watts").unwrap(),
             300,
             Some(0.0),
             Some(24000.0),
