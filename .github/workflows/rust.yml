@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "main", "next" ]
+    branches: ["main", "next", "v0.2.x", "v0.3.x"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main", "v0.2.x", "v0.3.x"]
 
 jobs:
   ubuntu:
@@ -18,15 +18,15 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: |
-        apt-get update
-        apt-get install -qy librrd-dev curl build-essential pkg-config libclang-dev
-    - name: Quick check
-      uses: ./.github/actions/quick-check
-      with:
-        locking_mode: ${{ matrix.version == '26.04' && 'true' || 'false' }}
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -qy librrd-dev curl build-essential pkg-config libclang-dev
+      - name: Quick check
+        uses: ./.github/actions/quick-check
+        with:
+          locking_mode: ${{ matrix.version == '26.04' && 'true' || 'false' }}
   fedora:
     runs-on: ubuntu-latest
     container:
@@ -35,26 +35,26 @@ jobs:
       matrix:
         version: ["41", "42", "43", "44"]
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: |
-        dnf group install -qy --refresh c-development
-        dnf install -qy rrdtool-devel curl clang
-    - name: Quick check
-      uses: ./.github/actions/quick-check
-      with:
-        locking_mode: 'true'
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          dnf group install -qy --refresh c-development
+          dnf install -qy rrdtool-devel curl clang
+      - name: Quick check
+        uses: ./.github/actions/quick-check
+        with:
+          locking_mode: "true"
   arch:
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: |
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm rrdtool clang pkgconfig
-    - name: Quick check
-      uses: ./.github/actions/quick-check
-      with:
-        locking_mode: 'true'
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm rrdtool clang pkgconfig
+      - name: Quick check
+        uses: ./.github/actions/quick-check
+        with:
+          locking_mode: "true"
