@@ -13,7 +13,7 @@ jobs:
       image: ubuntu:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["20.04", "22.04", "24.04", "25.04", "25.10", "26.04"]
+        version: ["18.04","20.04", "22.04", "24.04", "25.04", "25.10", "26.04", "26.10"]
     env:
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
@@ -26,14 +26,14 @@ jobs:
       - name: Quick check
         uses: ./.github/actions/quick-check
         with:
-          locking_mode: ${{ matrix.version == '26.04' && 'true' || 'false' }}
+          locking_mode: ${{ contains(fromJSON('["26.04","26.10"]'), matrix.version) && 'true' || 'false' }}
   fedora:
     runs-on: ubuntu-latest
     container:
       image: fedora:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["41", "42", "43", "44"]
+        version: ["43", "44", "45", "46"]
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
