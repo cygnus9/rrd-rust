@@ -13,7 +13,7 @@ jobs:
       image: ubuntu:${{ matrix.version }}
     strategy:
       matrix:
-        version: ["18.04","20.04", "22.04", "24.04", "25.04", "25.10", "26.04", "26.10"]
+        version: ["20.04", "22.04", "24.04", "25.04", "25.10", "26.04", "26.10"]
     env:
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
